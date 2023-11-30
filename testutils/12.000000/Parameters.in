@@ -1,0 +1,51 @@
+#Parmeters.in
+[General]
+DOS = ReadIn
+HkFile = hk_weighted_2valleys.dat
+beta = 1.000000
+NAt = 1
+magnetism = para
+totdens = 12.000000 
+EPSN = 0.000001
+mu_mixing = 0.7
+DMFTsteps = 0
+StatisticSteps = 1
+FileNamePrefix = dmft_blg
+fileold = old.hdf5
+readold = -1
+mixing = 0.7
+EPSEQ=0.001
+dc = Wterm
+Wterm_W         = force_list(default=None)
+Wterm_V         = float(default=0.0)
+Wterm_J         = float(default=0.0)
+Wterm_shifts    = force_list(default=None)
+Wterm_ll        = float(default=0.0)
+Wterm_a22       = float(default=0.0)
+Wterm_a11       = float(default=0.0)
+Wterm_beta      = float(default=0.0)
+WriteFullLattice = 1
+
+[Atoms]
+[[1]]
+QuantumNumbers = Nt Szt Azt
+Hamiltonian = Density
+Udd = 57.95
+Vdd = 57.95
+Jdd = 0.0
+Nd = 4
+Np = 8
+
+[QMC]
+Nwarmups = 200000
+Nmeas = 75000
+NCorr = 1500
+Niw = 2025
+Nftau = 1000
+Ntau = 500
+NLegMax = 30
+NLegOrder = 30
+TaudiffMax = 1.000000
+offdiag=0
+Percentage4OperatorMove=0.02
+MeasSusz=1
