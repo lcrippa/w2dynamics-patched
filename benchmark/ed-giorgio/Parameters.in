@@ -1,0 +1,29 @@
+[General]
+DOS = EDcheck
+half-bandwidth = 1, 2
+beta = 30 
+mu = 1.0 
+NAt = 1 
+DMFTsteps = 0
+StatisticSteps = 1
+FileNamePrefix = test
+magnetism=para
+FTType=legendre
+[Atoms]
+[[1]]
+Nd = 2 
+Hamiltonian = Kanamori
+Udd = 2.0 
+Jdd = 0.5 
+Vdd = 1.0 
+QuantumNumbers = Nt Szt Qzt 
+[QMC]
+Nwarmups = 500000
+Nmeas = 20000
+NCorr = 1000
+truncation = 6
+Ntau = 500 
+Niw = 5000
+NLegMax = 100 
+NLegOrder = 100 
+NSeed = 43855

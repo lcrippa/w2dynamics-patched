@@ -1,0 +1,36 @@
+#asdf
+[General]
+DOS = readDelta
+half-bandwidth = 1, 2
+beta = 30
+mu = 1.0 
+NAt = 1 
+DMFTsteps = 0
+StatisticSteps = 1
+FileNamePrefix = offdiag
+magnetism=para
+FTType=legendre
+[Atoms]
+[[1]]
+Nd = 2 
+Hamiltonian = Density
+Udd = 2.0
+Jdd = 0.5
+Vdd = 1.0
+QuantumNumbers = Nt Szt Azt
+[QMC]
+Nwarmups = 500000
+Nmeas = 10000
+NCorr = 500
+truncation = 5
+Ntau = 1000 
+Nftau = 1000
+Niw = 1000
+NLegMax = 100 
+NLegOrder = 100 
+NSeed = 43855
+Eigenbasis=1
+PercentageGlobalMove=0.005
+segment=0
+MeasSusz=0
+offdiag=1

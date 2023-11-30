@@ -1,0 +1,24 @@
+ ***** Anderson Impurities  Opt *****
+ L_unit   :            1
+ Beta     :    30.0000000000000     
+ Uhub     :    3.34000000000000     
+ g^2/2k   :   0.000000000000000E+000
+ om_0     :   7.500000000000000E-002
+ chem     :   -2.00000000000000     
+ Del      :   0.510000000000000     
+ dtau     :   1.000000000000000E-004
+ dtau_obs :   0.100000000000000     
+ Niom     :          500
+ P0_U     :    1.00010000000000     
+ N_recalc_fre  :         1000
+ N_obs_fre     :            1
+ NBin, Nspb, nfps:           20        1000        2000
+  Inconf and seed read from Confin:    904987569
+ Precision   :   1.595878984517185E-011
+ Precision_ph:   0.000000000000000E+000
+ Acc_add U :     0.409559761909809     
+ Acc_add ph:     0.000000000000000E+000
+ Acc_rem U :     0.409657573852571     
+ Acc_rem ph:     0.000000000000000E+000
+ Acc_sign  :     0.133523402447553     
+ Tot CPU time:    161.117400000000     

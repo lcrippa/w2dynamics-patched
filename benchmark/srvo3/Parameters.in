@@ -1,0 +1,34 @@
+[General]
+DOS = ReadIn
+HkFile = srvo3.ham_fine
+beta = 25
+mu = 1.75
+NAt = 1
+totdens = 1.0
+EPSN = 0.0001
+DMFTsteps = 30
+FileNamePrefix = tut1
+readold = 0
+fileold = tut2.hdf5
+magnetism = para
+
+[Atoms]
+[[1]]
+Hamiltonian = Kanamori
+Udd = 3.4
+Jdd = 0.47
+Vdd = 2.37
+Nd = 3
+
+[QMC]
+Nwarmups = 2000000
+Nmeas = 50000
+NCorr = 500
+truncation = 13
+Ntau = 100
+Niw = 2000
+NLegMax = 30
+NLegOrder = 30
+Eigenbasis = 1
+segment = 0
+offdiag = 0
