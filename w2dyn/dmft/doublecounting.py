@@ -293,7 +293,7 @@ class Wterm(SelfConsistent):
                 shifts = shifts[len(atslices):]
                 for i, shift in enumerate(atshifts):
                     if i == 0:
-                        diag_dc.append(self.w * (nu_uncorr - nu_corr) - self.v * nu_uncorr + shift)
+                        diag_dc.append(self.w[0] * (nu_uncorr - nu_corr) - self.v * nu_uncorr + shift)
                     else:
                         diag_dc.append(0.0 + shift)
                         
