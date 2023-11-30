@@ -256,54 +256,85 @@ class Wterm(SelfConsistent):
         
 
     def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
-        if densities is None:
+        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
             densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
             for iorb in range(12):
                 for ispin in range(2):
                     densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
-                    #densities[iorb,ispin,iorb,ispin] = 0.5
+
+                    
         densities = np.real(densities)
         diagonal_densities = orbspin.extract_diagonal(densities)
         shifts = np.array(self.shifts)
         tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
-        #Hartree shift
+        
+        #################
+        # Hartree shift #
+        #################
+        
         for ispin in range(2):
             for iorb in range(0,4):
                 tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[0]
             for iorb in range(4,12):
                 tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[1]
-        #W term
-        #term 1 (S284)
-        for ispin in range(2):
-            for iorb_c in range(4,8):
-                tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[0] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-            for iorb_c in range(8,12):
-                tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[1] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-
-        #term 2 (S284)
-        for ispin in range(2):
-            for iorb_f in range(4):
-                tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[0] * np.sum(diagonal_densities[slice(4,8,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,8,None), :])
-                tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[1] * np.sum(diagonal_densities[slice(8,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(8,12,None), :])
-
-        #term 3 (S284)
-        if False:
+                
+        #################        
+        # W and V terms #
+        #################
+        
+        if True: #this is the current convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
+            shifts = np.array(self.shifts)
+            diag_dc = []
+            for atom in self.atom_list:
+                nu_corr = np.sum(diagonal_densities[atom.dslice, :] - np.full_like(diagonal_densities, 0.5)[atom.dslice, :])
+                nu_uncorr = sum(np.sum(diagonal_densities[sl, :] - np.full_like(diagonal_densities, 0.5)[sl, :]) for sl in atom.ligslices)
+                atslices = [atom.dslice, *atom.ligslices]
+                atshifts = shifts[:len(atslices)]
+                shifts = shifts[len(atslices):]
+                for i, shift in enumerate(atshifts):
+                    if i == 0:
+                        diag_dc.append(self.w * (nu_uncorr - nu_corr) - self.v * nu_uncorr + shift)
+                    else:
+                        diag_dc.append(0.0 + shift)
+                        
+            #double minus trick
+            self.sav.from_shell(np.array(diag_dc))
+            tmp_dc_full += -self.sav.dc_value
+        
+        else: #this is the most general expression of the mf-decoupled term, but currently it explodes in the loop. It's split between W and V terms
+            #W term 1 (S284)
             for ispin in range(2):
-                for jspin in range(2):
-                    for iorb_f in range(4):
-                        for iorb_c in range(4,8):
-                            tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
-                            tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
-                        for iorb_c in range(8,12):
-                            tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
-                            tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
+                for iorb_c in range(4,8):
+                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[0] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
+                for iorb_c in range(8,12):
+                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[1] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
+
+            #W term 2 (S284)
+            for ispin in range(2):
+                for iorb_f in range(4):
+                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[0] * np.sum(diagonal_densities[slice(4,8,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,8,None), :])
+                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[1] * np.sum(diagonal_densities[slice(8,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(8,12,None), :])
+
+            #W term 3 (S284) This is the Fock term, which for now we don't consider
+            if False:
+                for ispin in range(2):
+                    for jspin in range(2):
+                        for iorb_f in range(4):
+                            for iorb_c in range(4,8):
+                                tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
+                                tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
+                            for iorb_c in range(8,12):
+                                tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
+                                tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
         
-        #V term    
-        for ispin in range(2):
-            for iorb_c in range(4,12):
-                tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
-        
-        #J term
+            #V term    
+            for ispin in range(2):
+                for iorb_c in range(4,12):
+                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
+                    
+        ##########
+        # J term #
+        ##########
         
         for iorb in range(2):
             for ivalley in range(2):
@@ -328,7 +359,10 @@ class Wterm(SelfConsistent):
                         tmp_dc_full[f_index_1,ispin,c_index_1,ispin] += -1.0 * self.j * densities[c_index_2,jspin,f_index_2,jspin]
                         tmp_dc_full[c_index_1,ispin,f_index_1,ispin] += -1.0 * self.j * densities[c_index_2,jspin,f_index_2,jspin]     
 
-        #Phonons mean-field decoupled
+        ################################
+        # Phonons mean-field decoupled #
+        ################################
+        
         #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms <f+f>c+c, and the 
         #entries need to be summed to get the density terms in the <c+c>f+f
         a_cc=np.array([\
@@ -348,13 +382,12 @@ class Wterm(SelfConsistent):
         [2,1,1,2,1,1j],\
         [2,2,1,1,1,1j]])
       
-        
         #Term coming from the ff term
         for ispin in range(2):
             for iorb in range(2):
                 for ivalley in range(2):
-                    f_index=self.orbvalley_index_phonons(iorb,ivalley)
-                    tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * ll * alpha22 * (densities[f_index,ispin,f_index,ispin] - 0.5)
+                    f_index=self.orbvalley_index_phonons(iorb,ivalley,"f")
+                    tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * ll * (alpha22**2) * (densities[f_index,ispin,f_index,ispin] - 0.5) #check shift
                    
         #V<f+f>c+c
         densterm=0.0
@@ -376,7 +409,12 @@ class Wterm(SelfConsistent):
             densterm += densities[a_cc[idens,0:4]] * (a_cc[idens,4] + a_cc[idens,5])
         for iterm in np.arange(np.shape(a_cc)[0]):
             tmp_dc_full[a_cc[iterm,0:4]] += 2 * densterm * (a_cc[idens,4] + a_cc[idens,5])
-                        
+        
+        
+        ######################
+        # Sum all and return #
+        ######################
+        
         self.dc_value = tmp_dc_full
         #here there was a self.sav.from_shell: this promoted the dc array to the diagonal of a matrix, with a minus sign. Then there was another minus sign
         #when assigning the return value of this function. We create directly the matrix, so we don't need to add the minus sign to compensate the one coming

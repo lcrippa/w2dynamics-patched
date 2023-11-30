@@ -422,6 +422,8 @@ if restarted_run:
 
     log("Continuing old run at old self-energy for %s mu = %.6g ...",
         mu_source_string, mu)
+    #this is a modification we made, so that the dc is read from the converged file.
+    #useful when that is actually a mf decoupled term
     dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_value, init=True)
     dmft_step.set_mu(mu)
 else:
