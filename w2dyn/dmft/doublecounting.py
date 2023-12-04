@@ -387,7 +387,7 @@ class Wterm(SelfConsistent):
             for iorb in range(2):
                 for ivalley in range(2):
                     f_index=self.orbvalley_index_phonons(iorb,ivalley,"f")
-                    tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * ll * (alpha22**2) * (densities[f_index,ispin,f_index,ispin] - 0.5) #check shift
+                    tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * ll * (alpha22**2) * (densities[f_index,ispin,f_index,ispin]) #check shift
                    
         #V<f+f>c+c
         densterm=0.0
