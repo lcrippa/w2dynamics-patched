@@ -295,7 +295,8 @@ class Wterm(SelfConsistent):
                     
         #double minus trick
         self.sav.from_shell(np.array(diag_dc))
-        tmp_dc_full += -self.sav.dc_value                
+        tmp_dc_full += -self.sav.dc_value          
+        
         #################        
         # W and V terms #
         #################
