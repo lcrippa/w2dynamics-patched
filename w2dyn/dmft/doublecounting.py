@@ -225,11 +225,12 @@ class SelfConsistent(DoubleCounting):
         self.self_cons = True
 
 class Wterm(SelfConsistent):
-    def __init__(self, w, v, j, ll, a22, a11, beta, shifts, *args, **kwargs):
+    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sav = ShellAveraged(self.shell_av['densities'],
                                  self.shell_av['atom_list'],
                                  self.shell_av['u_full'])
+        self.u2 = u2
         self.w = w
         self.v = v
         self.j = j
@@ -278,6 +279,23 @@ class Wterm(SelfConsistent):
             for iorb in range(4,12):
                 tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[1]
                 
+        #################        
+        # U2 terms #
+        #################
+        #this is suboptimal and adapted from the old dc we used, but just for the f terms. It's equation S279 by Bernevig
+        
+        diag_dc = []
+        for atom in self.atom_list:
+            nu_corr = np.sum(diagonal_densities[atom.dslice, :] - np.full_like(diagonal_densities, 0.5)[atom.dslice, :])
+            atslices = [atom.dslice, *atom.ligslices]
+            shifts = shifts[len(atslices):]
+            for i, shift in enumerate(atshifts):
+                if i == 0:
+                    diag_dc.append( 6.0 * self.u2 * nu_corr )
+                    
+        #double minus trick
+        self.sav.from_shell(np.array(diag_dc))
+        tmp_dc_full += -self.sav.dc_value                
         #################        
         # W and V terms #
         #################

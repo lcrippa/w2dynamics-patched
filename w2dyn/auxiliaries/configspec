@@ -211,6 +211,7 @@ dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
 dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
 dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals 
 siw_moments     = option('estimate', 'extract', default='estimate')
+Wterm_U2        = float(default=0.0)
 Wterm_W         = force_list(default=None)
 Wterm_V         = float(default=0.0)
 Wterm_J         = float(default=0.0)

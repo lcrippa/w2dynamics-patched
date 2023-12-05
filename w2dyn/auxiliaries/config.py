@@ -366,7 +366,8 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
     elif dc_type == 'trace':
         return doublecounting.Trace(ineq_list, lda_dens, atom_list, u_full)
     elif dc_type == 'Wterm':
-        return doublecounting.Wterm(np.array(cfg["General"]["Wterm_W"],dtype=np.double),
+        return doublecounting.Wterm(np.array(cfg["General"]["Wterm_U2"],dtype=np.double),
+                                    np.array(cfg["General"]["Wterm_W"],dtype=np.double),
                                     np.array(cfg["General"]["Wterm_V"],dtype=np.double),
                                     np.array(cfg["General"]["Wterm_J"],dtype=np.double),
                                     np.array(cfg["General"]["Wterm_ll"],dtype=np.double),
