@@ -393,6 +393,7 @@ class Wterm(SelfConsistent):
         [2,2,1,4,beta,1j*beta],\
         [2,3,1,1,a11,1j*a11],\
         [2,4,1,2,beta,1j*beta]])
+        
         #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms f+f<c+c>, and the 
         #entries need to be summed to get the density terms in the c+c<f+f>
         a_ff=np.array([\
