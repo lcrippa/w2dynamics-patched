@@ -1,7 +1,6 @@
 # Files ignored by git
 
 ### General ignored files ###
-.[!g]*
 *~
 
 ### Generated files in the build process ###
