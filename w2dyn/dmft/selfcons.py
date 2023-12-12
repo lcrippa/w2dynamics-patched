@@ -282,7 +282,7 @@ class DMFTStep:
 
         # Upfold self-energy.
         self.siw_full = 0
-        self.siw_moments = 0
+        self.siw_moments = 0*1j
         for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                             self.smom_dd):
             # Here, we potentially encounter a memory problem (a set of
