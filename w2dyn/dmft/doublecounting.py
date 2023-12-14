@@ -259,6 +259,7 @@ class Wterm(SelfConsistent):
 
     def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
         if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
+            #sys.exit("Fix, we need a proper density matrix")
             densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
             for iorb in range(12):
                 for ispin in range(2):
@@ -352,14 +353,16 @@ class Wterm(SelfConsistent):
                                 tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
                                 tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
         
-            #V term    
+            #V term (S292)
             for ispin in range(2):
                 for iorb_c in range(4,12):
                     tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
                     
         ##########
-        # J term #
+        # J term # 
         ##########
+        
+        #(S290)
         
         for iorb in range(2):
             for ivalley in range(2):
