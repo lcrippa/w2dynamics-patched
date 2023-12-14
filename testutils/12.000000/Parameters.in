@@ -1,21 +1,21 @@
 #Parmeters.in
 [General]
 DOS = ReadIn
-HkFile = hk_weighted_2valleys.dat
+HkFile = ../hk_weighted_2valleys.dat
 beta = 1.000000
 NAt = 1
 magnetism = para
-totdens = 12.000000 
+totdens = 12.000000
 EPSN = 0.000001
 mu_mixing = 0.7
-DMFTsteps = 0
-StatisticSteps = 1
+DMFTsteps = 25 
 FileNamePrefix = dmft_blg
 fileold = old.hdf5
-readold = -1
+readold = 0
 mixing = 0.7
 EPSEQ=0.001
 dc = Wterm
+Wterm_U2        = 0.0
 Wterm_W         = 47.12,47.12
 Wterm_V         = 48.33
 Wterm_J         = 0.0
@@ -44,6 +44,6 @@ Ntau = 500
 NLegMax = 30
 NLegOrder = 30
 TaudiffMax = 1.000000
-offdiag=0
+offdiag=1
 Percentage4OperatorMove=0.02
 MeasSusz=1

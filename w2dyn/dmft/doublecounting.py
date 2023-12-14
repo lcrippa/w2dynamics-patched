@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division,
 import numpy as np
 import w2dyn.dmft.orbspin as orbspin
 import w2dyn.dmft.atoms as atoms
+import sys
 # import w2dyn.dmft.lattice as lattice
 # import w2dyn.auxiliaries.transform as tf
 
@@ -263,7 +264,9 @@ class Wterm(SelfConsistent):
                 for ispin in range(2):
                     densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
 
-                    
+        #this is just for testing
+        #densities = np.ones((self.norbitals, self.nspins, self.norbitals, self.nspins))
+        
         densities = np.real(densities)
         diagonal_densities = orbspin.extract_diagonal(densities)
         shifts = np.array(self.shifts)
@@ -388,14 +391,14 @@ class Wterm(SelfConsistent):
         #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms <f+f>c+c, and the 
         #entries need to be summed to get the density terms in the <c+c>f+f
         a_cc=np.array([\
-        [1,1,2,3,self.a11,-1*self.a11],\
-        [1,2,2,4,self.beta,-1*self.beta],\
-        [1,3,2,1,self.a11,-1*self.a11],\
-        [1,4,2,2,self.beta,-1*self.beta],\
-        [2,1,1,3,self.a11,1*self.a11],\
-        [2,2,1,4,self.beta,1*self.beta],\
-        [2,3,1,1,self.a11,1*self.a11],\
-        [2,4,1,2,self.beta,1*self.beta]])
+        [1,1,2,3,self.a11,-self.a11],\
+        [1,2,2,4,self.beta,-self.beta],\
+        [1,3,2,1,self.a11,-self.a11],\
+        [1,4,2,2,self.beta,-self.beta],\
+        [2,1,1,3,self.a11,self.a11],\
+        [2,2,1,4,self.beta,self.beta],\
+        [2,3,1,1,self.a11,self.a11],\
+        [2,4,1,2,self.beta,self.beta]])
         
         #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms f+f<c+c>, and the 
         #entries need to be summed to get the density terms in the c+c<f+f>
@@ -413,74 +416,104 @@ class Wterm(SelfConsistent):
                     tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * self.ll * (self.a22**2) * (densities[f_index,ispin,f_index,ispin]) #check shift
                    
         #V<f+f>c+c
-        densterm=[0.0,0.0]
-        for idens in np.arange(np.shape(a_ff)[0]):
-            ivalley=int(a_ff[idens,0])-1
-            iorb=int(a_ff[idens,1])-1
-            jvalley=int(a_ff[idens,2])-1
-            jorb=int(a_ff[idens,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
-            for ispin in np.arange(2):
-                densterm[ispin] += densities[iindex,ispin,jindex,ispin] * (a_ff[idens,4] + 1j*a_ff[idens,5])
-        for iterm in np.arange(np.shape(a_cc)[0]):
-            ivalley=int(a_cc[iterm,0])-1
-            iorb=int(a_cc[iterm,1])-1
-            jvalley=int(a_cc[iterm,2])-1
-            jorb=int(a_cc[iterm,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
-            for ispin in np.arange(2):
-                tmp_dc_full[iindex,ispin,jindex,ispin] += densterm[ispin] * (a_cc[idens,4] + 1j*a_cc[idens,5])
-        
+        densterm=np.zeros([2,2])*1j
+        for ixy in range(4,6): #x component, y component
+            for idens in np.arange(np.shape(a_ff)[0]):
+                ivalley=int(a_ff[idens,0])-1
+                iorb=int(a_ff[idens,1])-1
+                jvalley=int(a_ff[idens,2])-1
+                jorb=int(a_ff[idens,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_ff[idens,ixy]
+                    else:
+                        coeff = 1j*a_ff[idens,ixy]
+                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
+            for iterm in np.arange(np.shape(a_cc)[0]):
+                ivalley=int(a_cc[iterm,0])-1
+                iorb=int(a_cc[iterm,1])-1
+                jvalley=int(a_cc[iterm,2])-1
+                jorb=int(a_cc[iterm,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_cc[iterm,ixy]
+                    else:
+                        coeff = 1j*a_cc[iterm,ixy]
+                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * self.a22 * densterm[ispin,ixy-4] * coeff
+ 
         #V<c+c>f+f
-        densterm=0.0
-        for idens in np.arange(np.shape(a_cc)[0]):
-            ivalley=int(a_cc[idens,0])-1
-            iorb=int(a_cc[idens,1])-1
-            jvalley=int(a_cc[idens,2])-1
-            jorb=int(a_cc[idens,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
-            for ispin in np.arange(2):
-                densterm += densities[iindex,ispin,jindex,ispin] * (a_cc[iterm,4] + 1j*a_cc[iterm,5])
-        for iterm in np.arange(np.shape(a_ff)[0]):
-            ivalley=int(a_ff[iterm,0])-1
-            iorb=int(a_ff[iterm,1])-1
-            jvalley=int(a_ff[iterm,2])-1
-            jorb=int(a_ff[iterm,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
-            for ispin in np.arange(2):
-                tmp_dc_full[iindex,ispin,jindex,ispin] += densterm * (a_ff[iterm,4] + 1j*a_ff[iterm,5])
+        densterm=np.zeros([2,2])*1j
+        for ixy in range(4,6): #x component, y component
+            for idens in np.arange(np.shape(a_cc)[0]):
+                ivalley=int(a_cc[idens,0])-1
+                iorb=int(a_cc[idens,1])-1
+                jvalley=int(a_cc[idens,2])-1
+                jorb=int(a_cc[idens,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_cc[idens,ixy]
+                    else:
+                        coeff = 1j*a_cc[idens,ixy]
+                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
+            for iterm in np.arange(np.shape(a_ff)[0]):
+                ivalley=int(a_ff[iterm,0])-1
+                iorb=int(a_ff[iterm,1])-1
+                jvalley=int(a_ff[iterm,2])-1
+                jorb=int(a_ff[iterm,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_ff[iterm,ixy]
+                    else:
+                        coeff = 1j*a_ff[iterm,ixy]
+                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * self.a22 * densterm[ispin,ixy-4] * coeff
         
         #V<c+c>c+c
-        densterm=0.0
-        for idens in np.arange(np.shape(a_cc)[0]):
-            ivalley=int(a_cc[idens,0])-1
-            iorb=int(a_cc[idens,1])-1
-            jvalley=int(a_cc[idens,2])-1
-            jorb=int(a_cc[idens,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
-            for ispin in np.arange(2):
-                densterm += densities[iindex,ispin,jindex,ispin] * (a_cc[iterm,4] + 1j*a_cc[iterm,5])
-        for iterm in np.arange(np.shape(a_cc)[0]):
-            ivalley=int(a_cc[iterm,0])-1
-            iorb=int(a_cc[iterm,1])-1
-            jvalley=int(a_cc[iterm,2])-1
-            jorb=int(a_cc[iterm,3])-1
-            iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-            jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
-            for ispin in np.arange(2):
-                tmp_dc_full[iindex,ispin,jindex,ispin] += 2 * densterm * (a_cc[iterm,4] + 1j*a_cc[iterm,5])
+        densterm=np.zeros([2,2])*1j
+        for ixy in range(4,6): #x component, y component
+            for idens in np.arange(np.shape(a_cc)[0]):
+                ivalley=int(a_cc[idens,0])-1
+                iorb=int(a_cc[idens,1])-1
+                jvalley=int(a_cc[idens,2])-1
+                jorb=int(a_cc[idens,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_cc[idens,ixy]
+                    else:
+                        coeff = 1j*a_cc[idens,ixy]
+                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
+            for iterm in np.arange(np.shape(a_cc)[0]):
+                ivalley=int(a_cc[iterm,0])-1
+                iorb=int(a_cc[iterm,1])-1
+                jvalley=int(a_cc[iterm,2])-1
+                jorb=int(a_cc[iterm,3])-1
+                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
+                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                for ispin in np.arange(2):
+                    if ixy == 4:
+                        coeff = a_cc[iterm,ixy]
+                    else:
+                        coeff = 1j*a_cc[iterm,ixy]
+                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * 2 * densterm[ispin,ixy-4] * coeff
         
         
         ######################
         # Sum all and return #
         ######################
         
+        #print(np.any(np.iscomplex(tmp_dc_full)))
+        #sys.exit()
         self.dc_value = tmp_dc_full
+
         #here there was a self.sav.from_shell: this promoted the dc array to the diagonal of a matrix, with a minus sign. Then there was another minus sign
         #when assigning the return value of this function. We create directly the matrix, so we don't need to add the minus sign to compensate the one coming
         #from sav.from_shell
