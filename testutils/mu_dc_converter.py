@@ -49,7 +49,7 @@ for i in [6,7,10,11]:
 shuffle = w_term*(np.real(nuf_occ)-4) + v_term*(np.real(nuc_type1+nuc_type2)-8)
 
 if what=="mu":
-    shifted_mu = np.real(xmu) - shuffle
+    shifted_mu = np.real(xmu) + shuffle
     print(shifted_mu)
 if what=="dc":
     shifted_dc=np.zeros(12)
