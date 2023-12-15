@@ -424,7 +424,16 @@ if restarted_run:
         mu_source_string, mu)
     #this is a modification we made, so that the dc is read from the converged file.
     #useful when that is actually a mf decoupled term
-    dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_value, init=True)
+    dc_type = cfg["General"]["dc"]
+    if isinstance(dc_type, list):
+        dc_user_values = np.array(dc_type, float)
+        if dc_user_values.size != mylattice.norbitals:
+            raise ValueError("Expected %d elements" % mylattice.norbitals)
+        dc_user_values = np.repeat(dc_user_values[:,None], mylattice.nspins, 1)
+        dc_user_values = orbspin.promote_diagonal(dc_user_values)
+        dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_user_values, init=True)
+    else:
+        dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_value, init=True)
     dmft_step.set_mu(mu)
 else:
     log("Starting new run without self-energy for %s mu = %.6g ...",
