@@ -1,4 +1,4 @@
-#!/env /usr/bin/python
+#!/usr/bin/env python
 
 import numpy as np
 import os,sys
@@ -46,15 +46,17 @@ for i in [4,5,8,9]:
 for i in [6,7,10,11]:
     nuc_type2 = nuc_type2 + gdensold[i,0,i,0] + gdensold[i,1,i,1]
 
+shuffle = w_term*(np.real(nuf_occ)-4) + v_term*(np.real(nuc_type1+nuc_type2)-8)
+
 if what=="mu":
-    shifted_mu = np.real(xmu) + w_term*(np.real(nuf_occ)-4) + v_term*(np.real(nuc_type1+nuc_type2)-8)
+    shifted_mu = np.real(xmu) - shuffle
     print(shifted_mu)
 if what=="dc":
     shifted_dc=np.zeros(12)
     for i in range(0,4):
-        shifted_dc[i] = dc[i,0] + w_term*(np.real(nuc_type1+nuc_type2)-8)
+        shifted_dc[i] = dc[i,0] + shuffle
     for i in range(4,12):
-        shifted_dc[i] = w_term*(np.real(nuc_type1+nuc_type2)-8)
+        shifted_dc[i] = shuffle
     print(*shifted_dc, sep=", ")
 
 
