@@ -316,12 +316,11 @@ class Wterm(SelfConsistent):
                 nu_uncorr = sum(np.sum(diagonal_densities[sl, :] - np.full_like(diagonal_densities, 0.5)[sl, :]) for sl in atom.ligslices)
                 atslices = [atom.dslice, *atom.ligslices]
                 atshifts = shifts[:len(atslices)]
-                shifts = shifts[len(atslices):]
                 for i, shift in enumerate(atshifts):
                     if i == 0:
-                        diag_dc.append(self.w[0] * (nu_uncorr - nu_corr) - self.v * nu_uncorr + shift)
+                        diag_dc.append(self.w[0] * (nu_uncorr - nu_corr) - self.v * nu_uncorr)
                     else:
-                        diag_dc.append(0.0 + shift)
+                        diag_dc.append(0.0)
                         
             #double minus trick
             self.sav.from_shell(np.array(diag_dc))
