@@ -308,7 +308,7 @@ class Wterm(SelfConsistent):
         # W and V terms #
         #################
         
-        if True: #this is the current convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
+        if False: #this is the current convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
             shifts = np.array(self.shifts)
             diag_dc = []
             for atom in self.atom_list:
