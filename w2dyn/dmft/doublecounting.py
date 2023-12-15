@@ -512,7 +512,12 @@ class Wterm(SelfConsistent):
         # Sum all and return #
         ######################
         
-        #print(np.any(np.iscomplex(tmp_dc_full)))
+        if np.any(np.iscomplex(tmp_dc_full)):
+            sys.exit("DC has finite imaginary part!")
+        else:
+            tmp_dc_full=np.real(tmp_dc_full)
+        #print(np.shape(np.real(tmp_dc_full)))
+        #print(tmp_dc_full[0,0,0,0])
         #sys.exit()
         self.dc_value = tmp_dc_full
 
