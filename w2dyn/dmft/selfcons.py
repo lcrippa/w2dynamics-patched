@@ -245,6 +245,19 @@ class DMFTStep:
                 siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                 ineq.d_setpart(self.sigma_hartree, 0)
 
+        # now we do the self-consistent mixing as well.
+        # if dc_full is not None, it comes from a restarted run. We do not want to
+        # overwrite the restart value here!
+        if self.dc.self_cons and ( dc_full is None ):
+            # this currently should only work for trace dc
+            # todo: fix siginfbar
+            if new_run:
+                dens = None
+            else:
+                self.siw2gloc()
+                dens = self.get_loc_imp_mixdens()
+            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws,occs=occs, densities=dens)
+
         # Perform mixing of self-energy, its moments and
         # double-counting with the same mixer. This is important to
         # keep them "consistent", i.e., double-count correlations at
@@ -262,20 +275,6 @@ class DMFTStep:
             self.dc_full = self.dc_full * 0
             dp_dc = doublecounting.Fixed_dp_Distance()
             self.dc_full = -dp_dc.get(self.dc_full, self.siw_dd, self.smom_dd, self.iwf, self.natoms, self.dc_dp_orbitals)
-
-        # not doing mixing for self consistent dc
-        # if we do want to mix... simply move this part above the mixing routine
-        # if dc_full is not None, it comes from a restarted run. We do not want to
-        # overwrite the restart value here!
-        if self.dc.self_cons and ( dc_full is None ):
-            # this currently should only work for trace dc
-            # todo: fix siginfbar
-            if new_run:
-                dens = None
-            else:
-                self.siw2gloc()
-                dens = self.get_loc_imp_mixdens()
-            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws,occs=occs, densities=dens)
 
         # Store impurity occupations for 'mixed' densities
         self.occ_dd = occs
