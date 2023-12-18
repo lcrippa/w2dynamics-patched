@@ -113,7 +113,7 @@ class FrequencyDistribution:
 class DMFTStep:
     def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
                  udd_full=None, udp_full=None, upp_full=None, paramag=False,
-                 siw_mixer=None, mu_mixer=None, mpi_comm=None):
+                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None):
 
         if beta < 0: raise ValueError("beta must be positive")
         if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
@@ -121,6 +121,7 @@ class DMFTStep:
         if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
         if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
         if mu_mixer is None: mu_mixer = mixing.LinearMixer()
+        if dc_mixer is None: dc_mixer = mixing.FlatMixingDecorator(mixing.DiisMixer())
 
         self.mpi_comm = mpi_comm
 
@@ -140,6 +141,7 @@ class DMFTStep:
 
         self.siw_mixer = siw_mixer
         self.mu_mixer = mu_mixer
+        self.dc_mixer = dc_mixer
 
         self._eye = lattice.eye
 
@@ -266,7 +268,9 @@ class DMFTStep:
         # necessary in particular because the earlier values
         # themselves influence the ratios in which they are mixed in.
         if mix:
-            self.dc_full, self.siw_dd, self.smom_dd = self.siw_mixer(self.dc_full, siw_dd, smom_dd)
+            #self.dc_full, self.siw_dd, self.smom_dd = self.siw_mixer(self.dc_full, siw_dd, smom_dd)
+            self.siw_dd, self.smom_dd = self.siw_mixer(siw_dd, smom_dd)
+            self.dc_full = self.dc_mixer(self.dc_full)
         else:
             self.siw_dd, self.smom_dd = siw_dd, smom_dd
 

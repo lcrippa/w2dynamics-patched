@@ -1,20 +1,25 @@
-#Parmeters.in
+#Parameters.in
 [General]
 DOS = ReadIn
 HkFile = ../hk_weighted_2valleys.dat
 beta = 1.000000
 NAt = 1
 magnetism = para
-totdens = 12.000000
+totdens = 11.200000
 EPSN = 0.000001
 mu_mixing = 0.7
-DMFTsteps = 25 
+DMFTsteps = 25
 FileNamePrefix = dmft_blg
 fileold = old.hdf5
-readold = 0
+readold = -1
 mixing = 0.7
+dc_mixing = 0.7
+mixing_diis_history = 5
+mixing_diis_period = 3
+
 EPSEQ=0.001
 dc = Wterm
+Wterm_U2	= 0.0
 Wterm_W         = 47.12,47.12
 Wterm_V         = 48.33
 Wterm_J         = 0.0
@@ -29,7 +34,7 @@ WriteFullLattice = 1
 [[1]]
 QuantumNumbers = Nt Szt All
 Hamiltonian = ReadUmatrix
-umatrix = "u_matrix.dat"
+umatrix = u_matrix.dat
 Nd = 4
 Np = 8
 

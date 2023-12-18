@@ -286,7 +286,13 @@ restarted_run = cfg["General"]["readold"]
 
 siw_mixer = mixing.FlatMixingDecorator(
     mixing.LinearMixer(cfg["General"]["mixing"]))
+    
 mu_mixer = mixing.LinearMixer(cfg["General"]["mu_mixing"])
+dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
+        mixing.DiisMixer(cfg["General"]["dc_mixing"],
+                         cfg["General"]["mixing_diis_history"],
+                         cfg["General"]["mixing_diis_period"])))
+
 if "diis" == cfg["General"]["mixing_strategy"]:
     siw_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
         mixing.DiisMixer(cfg["General"]["mixing"],
@@ -297,7 +303,7 @@ if not restarted_run:
 dmft_step = selfcons.DMFTStep(
       beta, mylattice, ineq_list, niw, nftau, dc_dp, dc_dp_orbitals,
       GW, GW_KAverage, natoms, dc, udd_full, udp_full, upp_full,
-      paramag, siw_mixer, mu_mixer, mpi_comm
+      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm
       )
 
 if restarted_run:
