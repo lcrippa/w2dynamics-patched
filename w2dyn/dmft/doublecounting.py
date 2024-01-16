@@ -241,14 +241,14 @@ class Wterm(SelfConsistent):
         self.a11 = a11
         self.beta = beta
         
-    def orbvalley_index(self,orbindex,valleyindex,elec_type):
+    def orbvalley_index_j(self,orbindex,valleyindex,elec_type):
         if elec_type=="f":
             orbvalley= 2 * valleyindex + orbindex
         if elec_type=="c":
             orbvalley= 4 + 4 * valleyindex + orbindex + 2
         return orbvalley
         
-    def orbvalley_index_phonons(self,orbindex,valleyindex,elec_type):
+    def orbvalley_index(self,orbindex,valleyindex,elec_type):
         if elec_type=="f":
             Norb=2
         if elec_type=="c":
@@ -314,28 +314,29 @@ class Wterm(SelfConsistent):
         else: #this is the most general expression of the mf-decoupled term, but currently it explodes in the loop. It's split between W and V terms
             #W term 1 (S284)
             for ispin in range(2):
-                for iorb_c in range(4,8):
-                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[0] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-                for iorb_c in range(8,12):
-                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.w[1] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
+                for ival_c in range(2):
+                    for iorb_c in range(4):
+                        index_c = self.orbvalley_index(iorb_c,ival_c,"c")
+                        tmp_dc_full[index_c,ispin,index_c,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
 
             #W term 2 (S284)
             for ispin in range(2):
                 for iorb_f in range(4):
-                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[0] * np.sum(diagonal_densities[slice(4,8,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,8,None), :])
-                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[1] * np.sum(diagonal_densities[slice(8,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(8,12,None), :])
+                    for val_c in range(2):
+                        for iorb_c in range(4):
+                            index_c = self.orbvalley_index(iorb_c,ival_c,"c")
+                            tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
 
             #W term 3 (S284) This is the Fock term, which for now we don't consider
             if True:
                 for ispin in range(2):
                     for jspin in range(2):
                         for iorb_f in range(4):
-                            for iorb_c in range(4,8):
-                                tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
-                                tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[0] * densities[iorb_c,jspin,iorb_f,ispin]
-                            for iorb_c in range(8,12):
-                                tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
-                                tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
+                            for ival_c in range(2):
+                                for iorb_c in range(4):
+                                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
+                                    tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
+                                    tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
 
         
             #V term (S292)
@@ -351,10 +352,10 @@ class Wterm(SelfConsistent):
         
         for iorb in range(2):
             for ivalley in range(2):
-                f_index_1 = self.orbvalley_index(iorb,ivalley,"f")
-                c_index_1 = self.orbvalley_index(iorb,ivalley,"c")
-                f_index_2 = self.orbvalley_index(not(iorb),not(ivalley),"f")
-                c_index_2 = self.orbvalley_index(not(iorb),not(ivalley),"c")
+                f_index_1 = self.orbvalley_index_j(iorb,ivalley,"f")
+                c_index_1 = self.orbvalley_index_j(iorb,ivalley,"c")
+                f_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"f")
+                c_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"c")
                 for ispin in range(2):
                     for jspin in range(2):
                         #term 1 (S288)
@@ -400,7 +401,7 @@ class Wterm(SelfConsistent):
         for ispin in range(2):
             for iorb in range(2):
                 for ivalley in range(2):
-                    f_index=self.orbvalley_index_phonons(iorb,ivalley,"f")
+                    f_index=self.orbvalley_index(iorb,ivalley,"f")
                     tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * self.ll * (self.a22**2) * (densities[f_index,ispin,f_index,ispin]) #check shift
                    
         #V<f+f>c+c
@@ -411,8 +412,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_ff[idens,1])-1
                 jvalley=int(a_ff[idens,2])-1
                 jorb=int(a_ff[idens,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
+                iindex=self.orbvalley_index(iorb,ivalley,"f")
+                jindex=self.orbvalley_index(jorb,jvalley,"f")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_ff[idens,ixy]
@@ -424,8 +425,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_cc[iterm,1])-1
                 jvalley=int(a_cc[iterm,2])-1
                 jorb=int(a_cc[iterm,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                iindex=self.orbvalley_index(iorb,ivalley,"c")
+                jindex=self.orbvalley_index(jorb,jvalley,"c")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_cc[iterm,ixy]
@@ -441,8 +442,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_cc[idens,1])-1
                 jvalley=int(a_cc[idens,2])-1
                 jorb=int(a_cc[idens,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                iindex=self.orbvalley_index(iorb,ivalley,"c")
+                jindex=self.orbvalley_index(jorb,jvalley,"c")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_cc[idens,ixy]
@@ -454,8 +455,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_ff[iterm,1])-1
                 jvalley=int(a_ff[iterm,2])-1
                 jorb=int(a_ff[iterm,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"f")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"f")
+                iindex=self.orbvalley_index(iorb,ivalley,"f")
+                jindex=self.orbvalley_index(jorb,jvalley,"f")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_ff[iterm,ixy]
@@ -471,8 +472,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_cc[idens,1])-1
                 jvalley=int(a_cc[idens,2])-1
                 jorb=int(a_cc[idens,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                iindex=self.orbvalley_index(iorb,ivalley,"c")
+                jindex=self.orbvalley_index(jorb,jvalley,"c")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_cc[idens,ixy]
@@ -484,8 +485,8 @@ class Wterm(SelfConsistent):
                 iorb=int(a_cc[iterm,1])-1
                 jvalley=int(a_cc[iterm,2])-1
                 jorb=int(a_cc[iterm,3])-1
-                iindex=self.orbvalley_index_phonons(iorb,ivalley,"c")
-                jindex=self.orbvalley_index_phonons(jorb,jvalley,"c")
+                iindex=self.orbvalley_index(iorb,ivalley,"c")
+                jindex=self.orbvalley_index(jorb,jvalley,"c")
                 for ispin in np.arange(2):
                     if ixy == 4:
                         coeff = a_cc[iterm,ixy]
