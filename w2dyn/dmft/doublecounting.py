@@ -265,8 +265,6 @@ class Wterm(SelfConsistent):
                 for ispin in range(2):
                     densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
 
-        #this is just for testing
-        #densities = np.ones((self.norbitals, self.nspins, self.norbitals, self.nspins))
         
         densities = np.real(densities)
         diagonal_densities = orbspin.extract_diagonal(densities)
@@ -286,23 +284,10 @@ class Wterm(SelfConsistent):
         #################        
         # U2 terms #
         #################
-        #this is suboptimal and adapted from the old dc we used, but just for the f terms. It's equation S279 by Bernevig
-        shifts = np.array(self.shifts)
-        diag_dc = []
-        for atom in self.atom_list:
-            nu_corr = np.sum(diagonal_densities[atom.dslice, :] - np.full_like(diagonal_densities, 0.5)[atom.dslice, :])
-            atslices = [atom.dslice, *atom.ligslices]
-            atshifts = shifts[:len(atslices)]
-            shifts = shifts[len(atslices):]
-            for i, shift in enumerate(atshifts):
-                if i == 0:
-                    diag_dc.append( 6.0 * self.u2 * nu_corr )
-                else:
-                    diag_dc.append(0.0)
                     
-        #double minus trick
-        self.sav.from_shell(np.array(diag_dc))
-        tmp_dc_full += -self.sav.dc_value          
+        for ispin in range(2):
+            for iorb_f in range(4):
+                tmp_dc_full[iorb_f,ispin,iorb_f,ispin] +=  6.0 * self.u2 * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
         
         #################        
         # W and V terms #
@@ -341,7 +326,7 @@ class Wterm(SelfConsistent):
                     tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[1] * np.sum(diagonal_densities[slice(8,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(8,12,None), :])
 
             #W term 3 (S284) This is the Fock term, which for now we don't consider
-            if False:
+            if True:
                 for ispin in range(2):
                     for jspin in range(2):
                         for iorb_f in range(4):
@@ -351,6 +336,7 @@ class Wterm(SelfConsistent):
                             for iorb_c in range(8,12):
                                 tmp_dc_full[iorb_f,ispin,iorb_c,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
                                 tmp_dc_full[iorb_c,ispin,iorb_f,jspin] += -1.0 * self.w[1] * densities[iorb_c,jspin,iorb_f,ispin]
+
         
             #V term (S292)
             for ispin in range(2):
@@ -516,9 +502,10 @@ class Wterm(SelfConsistent):
             sys.exit("DC has finite imaginary part!")
         else:
             tmp_dc_full=np.real(tmp_dc_full)
-        #print(np.shape(np.real(tmp_dc_full)))
-        #print(tmp_dc_full[0,0,0,0])
-        #sys.exit()
+        
+        #set numerically small elements to 0
+        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
+        
         self.dc_value = tmp_dc_full
 
         #here there was a self.sav.from_shell: this promoted the dc array to the diagonal of a matrix, with a minus sign. Then there was another minus sign

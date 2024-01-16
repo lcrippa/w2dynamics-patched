@@ -208,6 +208,10 @@ half-bandwidth  = force_list(default=2.)        # half-bandwidth of the DOS
 NAt             = integer(default=1)
 dc              = option_or_list('anisimov','fll','Wterm','amf','trace','siginfbar','sigzerobar',default='anisimov')
 dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
+dc_mixing_strategy = option('linear','diis', default='linear')	 	# mixing between old and new SE
+dc_subblock     = integer(default=4)            # the d subblock
+dc_subblock_step = integer(default=1)            # every # the d-block is mixed
+dc_rest_step = integer(default=5)            # every # the rest is mixed
 dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
 dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals 
 siw_moments     = option('estimate', 'extract', default='estimate')

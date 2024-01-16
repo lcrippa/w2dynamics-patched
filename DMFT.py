@@ -284,14 +284,28 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
 
 restarted_run = cfg["General"]["readold"]
 
+
 siw_mixer = mixing.FlatMixingDecorator(
     mixing.LinearMixer(cfg["General"]["mixing"]))
     
 mu_mixer = mixing.LinearMixer(cfg["General"]["mu_mixing"])
-dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
+#dc_mixer = mixing.StaggeredMixingDecorator(4,1,5,mixing.LinearMixer())
+if cfg["General"]["dc_mixing_strategy"] == "linear":
+    print("Initializing DC mixer as LINEAR mixer")
+    dc_mixer = mixing.StaggeredMixingDecorator(cfg["General"]["dc_subblock"],cfg["General"]["dc_subblock_step"],cfg["General"]["dc_rest_step"],
+        mixing.LinearMixer(cfg["General"]["dc_mixing"]))
+elif cfg["General"]["dc_mixing_strategy"] == "diis":
+    print("Initializing DC mixer as DIIS mixer")
+    dc_mixer = mixing.StaggeredMixingDecorator(cfg["General"]["dc_subblock"],cfg["General"]["dc_subblock_step"],cfg["General"]["dc_rest_step"],
         mixing.DiisMixer(cfg["General"]["dc_mixing"],
                          cfg["General"]["mixing_diis_history"],
-                         cfg["General"]["mixing_diis_period"])))
+                         cfg["General"]["mixing_diis_period"]))
+#dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
+#    mixing.LinearMixer(cfg["General"]["dc_mixing"])))
+#dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
+#    mixing.DiisMixer(cfg["General"]["dc_mixing"],
+#                     cfg["General"]["mixing_diis_history"],
+#                     cfg["General"]["mixing_diis_period"])))
 
 if "diis" == cfg["General"]["mixing_strategy"]:
     siw_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
@@ -456,6 +470,7 @@ compute_fourpnt = cfg["QMC"]["FourPnt"]
 siw_method = cfg["General"]["SelfEnergy"]
 smom_method = cfg["General"]["siw_moments"]
 
+
 if cfg["QMC"]["ReuseMCConfig"] != 0:
     mccfgs = []
 
@@ -595,15 +610,14 @@ for iter_no in range(total_iterations + 1):
         output.write_quantity("smom", smoms)
         output.write_quantity("siw-trial", dmft_step.siw_dd)
 
-        log("Feeding back unmixed self-energies into lattice problem ...")
-        dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
+        #log("Feeding back unmixed self-energies into lattice problem ...")
+        #dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
 
         if fix_mu and mu_method in ("kappa", "curvefit"):
             imp_electrons_err = np.sqrt(imp_electrons_err)
             kmuiter.step(dmft_step.mu, imp_electrons, imp_electrons_err)
 
         if iter_type == "dmft":
-            log("Feeding back mixed self-energies into lattice problem ...")
             dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=True)
 
     elif iter_type == "worm":

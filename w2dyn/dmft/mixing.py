@@ -20,7 +20,7 @@ All mixer objects are callable, taking the new values as argument and
 returning the next proposal/trial value.
 """
 import numpy as np
-
+import sys
 import w2dyn.auxiliaries.deepflatten as deepflatten
 
 class InitialMixingDecorator(object):
@@ -54,6 +54,53 @@ class FlatMixingDecorator(object):
         x = deepflatten.flatten(args)
         x = self.mixer(x)
         x = deepflatten.restore(x, shape, types)
+        return x
+
+class StaggeredMixingDecorator(object):
+    """
+    This mixing decorator takes any kind of nested python lists with numbers and
+    numpy arrays and calls `mixer` with a one dimensional copy of the data. The
+    shape is restored after `mixer` returned.
+    """
+    def __init__(self, subblock, interval_d, interval_p, mixer):
+        self.Nd = int(subblock)
+        self.interval_d = int(interval_d)
+        self.interval_p = int(interval_p)
+        self.mixer = mixer
+        self.counter_d = 0
+        self.counter_p = 0
+        self.saved_value = None
+        print("DC: Experimental staggered mixer:")
+        print("DC: We will mix the first ",self.Nd," levels every ",self.interval_d)
+        print("DC: We will mix rest every ",self.interval_p)
+    def __call__(self, *args):
+        if len(args) == 1: 
+            args = np.asarray(args[0])
+        else:
+            args = np.asarray(args)
+        if self.saved_value is None:
+            print("DC: Save initial value")
+            self.saved_value = args
+        if self.counter_p % self.interval_p != 0:
+            print("DC: Not updating p-block at iteration ",self.counter_p)
+            tmp = np.copy(self.saved_value)
+        else:
+            print("DC: Updating p-block at iteration ",self.counter_p)
+            tmp = np.copy(args)
+        if self.counter_d % self.interval_d != 0:
+            print("DC: Not updating d-block at iteration ",self.counter_d)
+            tmp[...,0:self.Nd,:,0:self.Nd,:] = self.saved_value[...,0:self.Nd,:,0:self.Nd,:]
+        else:
+            print("DC: Updating d-block at iteration ",self.counter_d)
+            tmp[...,0:self.Nd,:,0:self.Nd,:] = args[...,0:self.Nd,:,0:self.Nd,:]
+        types = deepflatten.types(tmp)
+        shape = deepflatten.shapes(tmp)
+        x = deepflatten.flatten(tmp)
+        x = self.mixer(x)
+        x = deepflatten.restore(x, shape, types)
+        self.saved_value = np.asarray(x)
+        self.counter_d += 1
+        self.counter_p += 1
         return x
 
 class RealMixingDecorator(object):

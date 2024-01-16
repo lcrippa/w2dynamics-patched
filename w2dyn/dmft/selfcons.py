@@ -121,7 +121,9 @@ class DMFTStep:
         if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
         if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
         if mu_mixer is None: mu_mixer = mixing.LinearMixer()
-        if dc_mixer is None: dc_mixer = mixing.FlatMixingDecorator(mixing.DiisMixer())
+        #if dc_mixer is None: dc_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
+        #if dc_mixer is None: dc_mixer = mixing.StaggeredMixingDecorator(4,1,5,mixing.LinearMixer())
+        if dc_mixer is None: sys.exit("AAAAAAAAAAAAAAAAAAAAAAAAA") 
 
         self.mpi_comm = mpi_comm
 
@@ -256,24 +258,37 @@ class DMFTStep:
             if new_run:
                 dens = None
             else:
+                #print("AT LINE 261 SIW IS ",self.siw_full[0,0,0,0])
                 self.siw2gloc()
                 dens = self.get_loc_imp_mixdens()
-            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws,occs=occs, densities=dens)
+            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
 
-        # Perform mixing of self-energy, its moments and
-        # double-counting with the same mixer. This is important to
-        # keep them "consistent", i.e., double-count correlations at
-        # the same rate as switching them on, and with DIIS, the
-        # mixing of all related quantities using the same mixer is
-        # necessary in particular because the earlier values
-        # themselves influence the ratios in which they are mixed in.
+        #set numerically small elements to 0
+        self.dc_full[abs(self.dc_full) < 1e-10] = 0
+
+        # Perform mixing of self-energy, its moments 
+        
         if mix:
-            #self.dc_full, self.siw_dd, self.smom_dd = self.siw_mixer(self.dc_full, siw_dd, smom_dd)
             self.siw_dd, self.smom_dd = self.siw_mixer(siw_dd, smom_dd)
-            self.dc_full = self.dc_mixer(self.dc_full)
         else:
             self.siw_dd, self.smom_dd = siw_dd, smom_dd
-
+       
+        # Experimental doublecounting mixing
+        if mix:
+            self.dc_full = self.dc_mixer(self.dc_full)
+            #if self.iter_no == 0:
+            #    self.dc_old=np.copy(self.dc_full)
+            #if self.iter_no % self.mixing_every != 0:
+            #    print("Iteration ",str(self.iter_no),", NOT mixing dc for c orbitals")
+            #    dc_f_new = (1.0 - self.ratio) * self.dc_full[0:4,:,0:4,:] + self.ratio * self.dc_old[0:4,:,0:4,:]
+            #    self.dc_full = np.copy(self.dc_old)
+            #    self.dc_full[0:4,:,0:4,:] = dc_f_new
+            #    self.dc_old=np.copy(self.dc_full)
+            #else:
+            #    print("Iteration ",str(self.iter_no),", mixing dc for everything")
+            #    self.dc_full[:,:,:,:] = (1.0 - self.ratio) * self.dc_full[:,:,:,:] + self.ratio * self.dc_old[:,:,:,:]
+            #    self.dc_old=np.copy(self.dc_full)
+        
         # Fix the distance between selected d-orbitals and the p-manifold to the original distance of the LDA/GW Hamiltonian
         if self.dc_dp == 1:
             self.dc_full = self.dc_full * 0
@@ -286,6 +301,7 @@ class DMFTStep:
         # Upfold self-energy.
         self.siw_full = 0
         self.siw_moments = 0
+        #print("AT LINE 301 SIW IS ",self.siw_full)
         for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                             self.smom_dd):
             # Here, we potentially encounter a memory problem (a set of
@@ -294,10 +310,12 @@ class DMFTStep:
             # "chunks"
             self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
             self.siw_moments += ineq.d_upfold(siw_bl_mom)          
+        #print("AT LINE 310 SIW IS ",self.siw_full[0,0,0,0])
 
         # Add double-counting to the self-energy
         self.siw_full += self.dc_full
         self.siw_moments[0] += self.dc_full
+        #print("AT LINE 315 SIW IS ",self.siw_full[0,0,0,0])
 
         # This is an approximation: really, the partial densities and Hartree
         # self-energy an inter-dependent system. Here, we assume that the
@@ -315,6 +333,9 @@ class DMFTStep:
 
         self.siw_full += self.sigma_hartree
         self.siw_moments[0] += self.sigma_hartree.real
+
+        self.siw_full_bakup=np.copy(self.siw_full)
+        self.siw_moments_bakup=np.copy(self.siw_moments)
 
         # Invalidate lattice quantities (call to siw2gloc necessary)
         self.glociw = None
@@ -374,9 +395,9 @@ class DMFTStep:
         """Get densities from local lattice Green's function with
         d-orbital entries replaced with last impurity results."""
         mixdm = np.real(self.densmatrix).copy()
-        if self.occ_dd is not None:
-            for ineq, occ_slice in zip(self.ineq_list, self.occ_dd):
-                ineq.d_setpart(mixdm, np.real(occ_slice))
+        #if self.occ_dd is not None:
+        #    for ineq, occ_slice in zip(self.ineq_list, self.occ_dd):
+        #        ineq.d_setpart(mixdm, np.real(occ_slice))
         return mixdm
 
     def write_gloc(self, output, infix, full_od=False):
