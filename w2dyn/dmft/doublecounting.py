@@ -253,7 +253,7 @@ class Wterm(SelfConsistent):
             Norb=2
         if elec_type=="c":
             Norb=4
-        orbvalley = (elec_type=="f") + Norb * valleyindex + orbindex
+        orbvalley = 4*(elec_type=="c") + Norb * valleyindex + orbindex
         return orbvalley
         
 
