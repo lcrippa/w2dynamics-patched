@@ -113,7 +113,7 @@ class FrequencyDistribution:
 class DMFTStep:
     def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
                  udd_full=None, udp_full=None, upp_full=None, paramag=False,
-                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None):
+                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None, sigma_kick=0.0, sigma_kick_persist=1):
 
         if beta < 0: raise ValueError("beta must be positive")
         if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
@@ -121,9 +121,7 @@ class DMFTStep:
         if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
         if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
         if mu_mixer is None: mu_mixer = mixing.LinearMixer()
-        #if dc_mixer is None: dc_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
-        #if dc_mixer is None: dc_mixer = mixing.StaggeredMixingDecorator(4,1,5,mixing.LinearMixer())
-        if dc_mixer is None: sys.exit("AAAAAAAAAAAAAAAAAAAAAAAAA") 
+        if dc_mixer is None: sys.exit("DC mixer not defined")
 
         self.mpi_comm = mpi_comm
 
@@ -135,6 +133,10 @@ class DMFTStep:
         self.udp_full = udp_full
         self.upp_full = upp_full
         self.paramag = paramag
+        self.sigma_kick_thresh = sigma_kick
+        self.sigma_kick_persist = sigma_kick_persist
+        self.niter_kick = 0
+        
 
         if self.udp_full is None or upp_full is None:
             self.use_hartree = False
@@ -261,6 +263,20 @@ class DMFTStep:
                 #print("AT LINE 261 SIW IS ",self.siw_full[0,0,0,0])
                 self.siw2gloc()
                 dens = self.get_loc_imp_mixdens()
+                FIXME: put a kick in the density at the beginning
+                if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
+                    print("Adding dc kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
+                    if self.niter_kick == 0:
+                        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
+                        #itmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
+                        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
+                        #if self.mpi_comm is not None:
+                        #    self.mpi_comm.bcast(tmpmat, root=0)
+                        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
+                        for ispin in range(nspins):
+                            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
+                    dens += self.sigma_kick_mat
+                    self.niter_kick += 1    
             self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
 
         #set numerically small elements to 0
@@ -276,18 +292,6 @@ class DMFTStep:
         # Experimental doublecounting mixing
         if mix:
             self.dc_full = self.dc_mixer(self.dc_full)
-            #if self.iter_no == 0:
-            #    self.dc_old=np.copy(self.dc_full)
-            #if self.iter_no % self.mixing_every != 0:
-            #    print("Iteration ",str(self.iter_no),", NOT mixing dc for c orbitals")
-            #    dc_f_new = (1.0 - self.ratio) * self.dc_full[0:4,:,0:4,:] + self.ratio * self.dc_old[0:4,:,0:4,:]
-            #    self.dc_full = np.copy(self.dc_old)
-            #    self.dc_full[0:4,:,0:4,:] = dc_f_new
-            #    self.dc_old=np.copy(self.dc_full)
-            #else:
-            #    print("Iteration ",str(self.iter_no),", mixing dc for everything")
-            #    self.dc_full[:,:,:,:] = (1.0 - self.ratio) * self.dc_full[:,:,:,:] + self.ratio * self.dc_old[:,:,:,:]
-            #    self.dc_old=np.copy(self.dc_full)
         
         # Fix the distance between selected d-orbitals and the p-manifold to the original distance of the LDA/GW Hamiltonian
         if self.dc_dp == 1:
@@ -301,7 +305,7 @@ class DMFTStep:
         # Upfold self-energy.
         self.siw_full = 0
         self.siw_moments = 0
-        #print("AT LINE 301 SIW IS ",self.siw_full)
+
         for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                             self.smom_dd):
             # Here, we potentially encounter a memory problem (a set of
@@ -310,12 +314,12 @@ class DMFTStep:
             # "chunks"
             self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
             self.siw_moments += ineq.d_upfold(siw_bl_mom)          
-        #print("AT LINE 310 SIW IS ",self.siw_full[0,0,0,0])
+
 
         # Add double-counting to the self-energy
         self.siw_full += self.dc_full
         self.siw_moments[0] += self.dc_full
-        #print("AT LINE 315 SIW IS ",self.siw_full[0,0,0,0])
+        
 
         # This is an approximation: really, the partial densities and Hartree
         # self-energy an inter-dependent system. Here, we assume that the
@@ -333,10 +337,22 @@ class DMFTStep:
 
         self.siw_full += self.sigma_hartree
         self.siw_moments[0] += self.sigma_hartree.real
+        
+        FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
+        if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
+            print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
+            if self.niter_kick == 0:
+                self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
+                #tmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
+                #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
+                tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
+                for ispin in range(nspins):
+                    self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
+            self.siw_full += self.sigma_kick_mat
+            self.siw_moments[0] += self.sigma_kick_mat  
+            self.niter_kick += 1
 
-        self.siw_full_bakup=np.copy(self.siw_full)
-        self.siw_moments_bakup=np.copy(self.siw_moments)
-
+            
         # Invalidate lattice quantities (call to siw2gloc necessary)
         self.glociw = None
         self.densities = None
@@ -351,17 +367,18 @@ class DMFTStep:
     def update_mu(self, target_totdens, epsn, search_range):
         if epsn <= 0: raise ValueError("epsn must be greater than 0")
         if search_range <= 0: raise ValueError("search range must be > 0")
-
+                
         # Again consider only frequencies of the own process
         trace_factory = self.lattice.trace(self.my_iwf, self.siw_full, self.siw_moments, 'local', self.use_gw, self.siw_gw, self.smom_gw)
-
+        
 
         def root_func(mu):
             """f(mu) that has a root (zero) at the desired density"""
             trgloc = trace_factory.trgloc(mu)
             trgmodel, dmodel = trace_factory.trgmodel(mu)
-
+            
             totdens = (trgloc - trgmodel).sum()/self.beta
+            
             if self.mpi_comm is not None:
                 totdens = self.mpi_comm.allreduce(totdens)
             totdens += dmodel

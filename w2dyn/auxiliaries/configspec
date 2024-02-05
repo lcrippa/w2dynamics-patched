@@ -215,6 +215,8 @@ dc_rest_step = integer(default=5)            # every # the rest is mixed
 dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
 dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals 
 siw_moments     = option('estimate', 'extract', default='estimate')
+sigma_kick      = float(default=0.0)            # kick in self-energy
+sigma_kick_persist = integer(default=1)         # for how long should I keep the kick
 Wterm_U2        = float(default=0.0)
 Wterm_W         = force_list(default=None)
 Wterm_V         = float(default=0.0)

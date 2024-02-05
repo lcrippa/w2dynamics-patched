@@ -284,6 +284,8 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
 
 restarted_run = cfg["General"]["readold"]
 
+sigma_kick = cfg["General"]["sigma_kick"]
+sigma_kick_persist = cfg["General"]["sigma_kick_persist"]
 
 siw_mixer = mixing.FlatMixingDecorator(
     mixing.LinearMixer(cfg["General"]["mixing"]))
@@ -317,7 +319,7 @@ if not restarted_run:
 dmft_step = selfcons.DMFTStep(
       beta, mylattice, ineq_list, niw, nftau, dc_dp, dc_dp_orbitals,
       GW, GW_KAverage, natoms, dc, udd_full, udp_full, upp_full,
-      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm
+      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm, sigma_kick ,sigma_kick_persist
       )
 
 if restarted_run:
@@ -469,7 +471,6 @@ total_iterations = dmft_iterations + stat_iterations + worm_iterations
 compute_fourpnt = cfg["QMC"]["FourPnt"]
 siw_method = cfg["General"]["SelfEnergy"]
 smom_method = cfg["General"]["siw_moments"]
-
 
 if cfg["QMC"]["ReuseMCConfig"] != 0:
     mccfgs = []
