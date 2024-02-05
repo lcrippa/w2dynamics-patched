@@ -263,7 +263,7 @@ class DMFTStep:
                 #print("AT LINE 261 SIW IS ",self.siw_full[0,0,0,0])
                 self.siw2gloc()
                 dens = self.get_loc_imp_mixdens()
-                FIXME: put a kick in the density at the beginning
+                #FIXME: put a kick in the density at the beginning
                 if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
                     print("Adding dc kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
                     if self.niter_kick == 0:
