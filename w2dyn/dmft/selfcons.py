@@ -338,7 +338,7 @@ class DMFTStep:
         self.siw_full += self.sigma_hartree
         self.siw_moments[0] += self.sigma_hartree.real
         
-        FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
+        #FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
         if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
             print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
             if self.niter_kick == 0:
