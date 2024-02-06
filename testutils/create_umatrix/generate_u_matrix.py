@@ -13,7 +13,7 @@ except:
 try:
     scale_u=float(sys.argv[3])
 except:
-    scale_u=0.0
+    scale_u=1.0
 
 NBANDS=4
 
@@ -68,7 +68,7 @@ for iline in range(np.shape(kanamori_umatrix)[0]):
         kspin=0
     else:
         kspin=1
-    if kanamori_umatrix[iline,6]=="u":
+    if kanamori_umatrix[iline,7]=="u":
         lspin=0
     else:
         lspin=1
@@ -97,7 +97,7 @@ for iband in range(4):
                                 uvalue=interactionmatrix[iband,ispin,jband,jspin,kband,kspin,lband,lspin]
                                 if abs(uvalue) > 1e-15:
                                     orbvector=[str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(lspin)]
-                                    print(orbvector)
+                                    print(str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(lspin),uvalue)
                                     for icomp in range(8):
                                         f.write(orbvector[icomp])
                                         f.write(" ")
