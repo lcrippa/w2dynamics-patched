@@ -2,8 +2,19 @@
 import numpy as np
 import os,sys
 
-lbd=1
-alpha22=1
+try:
+    lbd=float(sys.argv[1])
+except:
+    lbd=-1.1
+try:
+    alpha22=float(sys.argv[2])
+except:
+    alpha22=2.1
+try:
+    scale_u=float(sys.argv[3])
+except:
+    scale_u=0.0
+
 NBANDS=4
 
 alpha22=alpha22**2
@@ -40,7 +51,7 @@ np.shape(kanamori_umatrix)
 kanamori_umatrix[0:3,:]
 
 for iline in range(np.shape(kanamori_umatrix)[0]):
-    uvalue=float(kanamori_umatrix[iline,8])
+    uvalue=float(kanamori_umatrix[iline,8])*scale_u
     iband=int(kanamori_umatrix[iline,0])-1
     jband=int(kanamori_umatrix[iline,2])-1
     kband=int(kanamori_umatrix[iline,4])-1
@@ -82,10 +93,11 @@ for iband in range(4):
                 for kband in range(4):
                     for kspin in range(2):
                         for lband in range(4):
-                            for jspin in range(2):
+                            for lspin in range(2):
                                 uvalue=interactionmatrix[iband,ispin,jband,jspin,kband,kspin,lband,lspin]
                                 if abs(uvalue) > 1e-15:
-                                    orbvector=[str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(kspin)]
+                                    orbvector=[str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(lspin)]
+                                    print(orbvector)
                                     for icomp in range(8):
                                         f.write(orbvector[icomp])
                                         f.write(" ")
