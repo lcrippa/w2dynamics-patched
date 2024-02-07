@@ -273,6 +273,7 @@ class DMFTStep:
                         #if self.mpi_comm is not None:
                         #    self.mpi_comm.bcast(tmpmat, root=0)
                         tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
+                        np.fill_diagonal(tmpmat,0.0)
                         for ispin in range(nspins):
                             self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
                     dens += self.sigma_kick_mat
@@ -339,18 +340,19 @@ class DMFTStep:
         self.siw_moments[0] += self.sigma_hartree.real
         
         #FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
-        if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
-            print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
-            if self.niter_kick == 0:
-                self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
-                #tmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
-                #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
-                tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
-                for ispin in range(nspins):
-                    self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
-            self.siw_full += self.sigma_kick_mat
-            self.siw_moments[0] += self.sigma_kick_mat  
-            self.niter_kick += 1
+        #if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
+        #    print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
+        #    if self.niter_kick == 0:
+        #        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
+        #        #tmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
+        #        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
+        #        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
+        #        np.fill_diagonal(tmpmat,0.0)
+        #        for ispin in range(nspins):
+        #            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
+        #    self.siw_full += self.sigma_kick_mat
+        #    self.siw_moments[0] += self.sigma_kick_mat  
+        #    self.niter_kick += 1
 
             
         # Invalidate lattice quantities (call to siw2gloc necessary)
