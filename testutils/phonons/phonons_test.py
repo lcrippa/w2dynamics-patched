@@ -9,9 +9,9 @@ densities=np.ones([12,2,12,2])
 tmp_dc_full=np.zeros([12,2,12,2])*1j
 
 a11=1.0
-a22=2.0
-beta=3.0
-ll=4.0
+a22=1.0
+beta=1.0
+ll=1.0
 
 def orbvalley_index(orbindex,valleyindex,elec_type):
     if elec_type=="f":
@@ -90,40 +90,46 @@ for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
                 dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
                 dens_jindex = orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
                 tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+   
+   
+   
+if True:       
+    tmp_dc_full=np.real(tmp_dc_full)       
+    for i in range(12):
+        print(str(tmp_dc_full[i,0,0,0])+"  "+str(tmp_dc_full[i,0,1,0])+"  "+str(tmp_dc_full[i,0,2,0])+"  "+str(tmp_dc_full[i,0,3,0])+"  "+str(tmp_dc_full[i,0,4,0])+"  "+str(tmp_dc_full[i,0,5,0])+"  "+str(tmp_dc_full[i,0,6,0])+"  "+str(tmp_dc_full[i,0,7,0])+"  "+str(tmp_dc_full[i,0,8,0])+"  "+str(tmp_dc_full[i,0,9,0])+"  "+str(tmp_dc_full[i,0,10,0])+"  "+str(tmp_dc_full[i,0,11,0]))
+
+if False: 
+    print(" ")
+    tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])
+    tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0])      
+    for i in range(12):
+        print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
+
+if False: 
+    print(" ")
+
+    for i in range(12):
+        for j in range(12):
+            if tmp_dc_full_bak[i,j] != 0:
+                tmp_dc_full[i,j]=1
+            else:
+                tmp_dc_full[i,j]=0
                 
-       
-#tmp_dc_full=np.real(tmp_dc_full)       
-#for i in range(12):
-#    print(str(tmp_dc_full[i,0,0,0])+"  "+str(tmp_dc_full[i,0,1,0])+"  "+str(tmp_dc_full[i,0,2,0])+"  "+str(tmp_dc_full[i,0,3,0])+"  "+str(tmp_dc_full[i,0,4,0])+"  "+str(tmp_dc_full[i,0,5,0])+"  "+str(tmp_dc_full[i,0,6,0])+"  "+str(tmp_dc_full[i,0,7,0])+"  "+str(tmp_dc_full[i,0,8,0])+"  "+str(tmp_dc_full[i,0,9,0])+"  "+str(tmp_dc_full[i,0,10,0])+"  "+str(tmp_dc_full[i,0,11,0]))
-    
-#print(" ")
-#tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])
-#tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0])      
-#for i in range(12):
-#    print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
-    
-#print(" ")
-
-#for i in range(12):
-#    for j in range(12):
-#        if tmp_dc_full_bak[i,j] != 0:
-#            tmp_dc_full[i,j]=1
-#        else:
-#            tmp_dc_full[i,j]=0
-            
-#for i in range(12):
-#    print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
-
-#for i in range(12):
-#    print(str(tmp_dc_full[i,1,1,1])+"  "+str(tmp_dc_full[i,1,2,1])+"  "+str(tmp_dc_full[i,1,3,1])+"  "+str(tmp_dc_full[i,1,4,1])+"  "+str(tmp_dc_full[i,1,5,1])+"  "+str(tmp_dc_full[i,1,6,1])+"  "+str(tmp_dc_full[i,1,7,1])+"  "+str(tmp_dc_full[i,1,8,1])+"  "+str(tmp_dc_full[i,1,9,1])+"  "+str(tmp_dc_full[i,1,10,1])+"  "+str(tmp_dc_full[i,1,11,1]))
+    for i in range(12):
+        print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
 
 
-firstop=phonons.onebody_op("f",ph.VfX)
-firstop.create_1bo()
-secondop=phonons.onebody_op("f",ph.VfX)
-secondop.create_1bo()
-twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll)
-twobodyterm.create_2bo()
-twobodyterm.normalorder()
-twobodyterm.decouple()
-twobodyterm.prettyprint_decoupled()
+
+
+
+if False:
+
+    firstop=phonons.onebody_op("f",ph.VfX)
+    firstop.create_1bo()
+    secondop=phonons.onebody_op("c",ph.VcX)
+    secondop.create_1bo()
+    twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll)
+    twobodyterm.create_2bo()
+    twobodyterm.normalorder()
+    twobodyterm.decouple()
+    twobodyterm.prettyprint_decoupled()
