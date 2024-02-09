@@ -6,6 +6,7 @@ import numpy as np
 import w2dyn.dmft.orbspin as orbspin
 import w2dyn.dmft.atoms as atoms
 import sys
+import w2dyn.dmft.mf_phonons as phonons
 # import w2dyn.dmft.lattice as lattice
 # import w2dyn.auxiliaries.transform as tf
 
@@ -377,122 +378,75 @@ class Wterm(SelfConsistent):
         # Phonons mean-field decoupled #
         ################################
         
-        #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms <f+f>c+c, and the 
-        #entries need to be summed to get the density terms in the <c+c>f+f
-        a_cc=np.array([\
-        [1,1,2,3,self.a11,-self.a11],\
-        [1,2,2,4,self.beta,-self.beta],\
-        [1,3,2,1,self.a11,-self.a11],\
-        [1,4,2,2,self.beta,-self.beta],\
-        [2,1,1,3,self.a11,self.a11],\
-        [2,2,1,4,self.beta,self.beta],\
-        [2,3,1,1,self.a11,self.a11],\
-        [2,4,1,2,self.beta,self.beta]])
+        ph=phonons.phonon_1bo_params(self.a11,self.beta)
         
-        #define Fabrizio's terms: 4 indices for orb and valley (spin is diagonal), x coefficient, y coefficient. These are for the terms f+f<c+c>, and the 
-        #entries need to be summed to get the density terms in the c+c<f+f>
-        a_ff=np.array([\
-        [1,1,2,2,1,-1],\
-        [1,2,2,1,1,-1],\
-        [2,1,1,2,1,1],\
-        [2,2,1,1,1,1]])
-      
-        #Term coming from the ff term
-        for ispin in range(2):
-            for iorb in range(2):
-                for ivalley in range(2):
-                    f_index=self.orbvalley_index(iorb,ivalley,"f")
-                    tmp_dc_full[f_index,ispin,f_index,ispin] += -2.0 * self.ll * (self.a22**2) * (densities[f_index,ispin,f_index,ispin]) #check shift
-                   
-        #V<f+f>c+c
-        densterm=np.zeros([2,2])*1j
-        for ixy in range(4,6): #x component, y component
-            for idens in np.arange(np.shape(a_ff)[0]):
-                ivalley=int(a_ff[idens,0])-1
-                iorb=int(a_ff[idens,1])-1
-                jvalley=int(a_ff[idens,2])-1
-                jorb=int(a_ff[idens,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"f")
-                jindex=self.orbvalley_index(jorb,jvalley,"f")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_ff[idens,ixy]
-                    else:
-                        coeff = 1j*a_ff[idens,ixy]
-                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
-            for iterm in np.arange(np.shape(a_cc)[0]):
-                ivalley=int(a_cc[iterm,0])-1
-                iorb=int(a_cc[iterm,1])-1
-                jvalley=int(a_cc[iterm,2])-1
-                jorb=int(a_cc[iterm,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"c")
-                jindex=self.orbvalley_index(jorb,jvalley,"c")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_cc[iterm,ixy]
-                    else:
-                        coeff = 1j*a_cc[iterm,ixy]
-                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * self.a22 * densterm[ispin,ixy-4] * coeff
- 
-        #V<c+c>f+f
-        densterm=np.zeros([2,2])*1j
-        for ixy in range(4,6): #x component, y component
-            for idens in np.arange(np.shape(a_cc)[0]):
-                ivalley=int(a_cc[idens,0])-1
-                iorb=int(a_cc[idens,1])-1
-                jvalley=int(a_cc[idens,2])-1
-                jorb=int(a_cc[idens,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"c")
-                jindex=self.orbvalley_index(jorb,jvalley,"c")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_cc[idens,ixy]
-                    else:
-                        coeff = 1j*a_cc[idens,ixy]
-                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
-            for iterm in np.arange(np.shape(a_ff)[0]):
-                ivalley=int(a_ff[iterm,0])-1
-                iorb=int(a_ff[iterm,1])-1
-                jvalley=int(a_ff[iterm,2])-1
-                jorb=int(a_ff[iterm,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"f")
-                jindex=self.orbvalley_index(jorb,jvalley,"f")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_ff[iterm,ixy]
-                    else:
-                        coeff = 1j*a_ff[iterm,ixy]
-                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * self.a22 * densterm[ispin,ixy-4] * coeff
-        
-        #V<c+c>c+c
-        densterm=np.zeros([2,2])*1j
-        for ixy in range(4,6): #x component, y component
-            for idens in np.arange(np.shape(a_cc)[0]):
-                ivalley=int(a_cc[idens,0])-1
-                iorb=int(a_cc[idens,1])-1
-                jvalley=int(a_cc[idens,2])-1
-                jorb=int(a_cc[idens,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"c")
-                jindex=self.orbvalley_index(jorb,jvalley,"c")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_cc[idens,ixy]
-                    else:
-                        coeff = 1j*a_cc[idens,ixy]
-                    densterm[ispin,ixy-4] += densities[iindex,ispin,jindex,ispin] * coeff
-            for iterm in np.arange(np.shape(a_cc)[0]):
-                ivalley=int(a_cc[iterm,0])-1
-                iorb=int(a_cc[iterm,1])-1
-                jvalley=int(a_cc[iterm,2])-1
-                jorb=int(a_cc[iterm,3])-1
-                iindex=self.orbvalley_index(iorb,ivalley,"c")
-                jindex=self.orbvalley_index(jorb,jvalley,"c")
-                for ispin in np.arange(2):
-                    if ixy == 4:
-                        coeff = a_cc[iterm,ixy]
-                    else:
-                        coeff = 1j*a_cc[iterm,ixy]
-                    tmp_dc_full[iindex,ispin,jindex,ispin] += -self.ll * 2 * densterm[ispin,ixy-4] * coeff
+        # f+f terms without density (coming from anticommutators in u_matrix), x and y
+        for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
+            firstop=phonons.onebody_op("f",phononterm[0])
+            firstop.create_1bo()
+            secondop=phonons.onebody_op("f",phononterm[1])
+            secondop.create_1bo()
+            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22**2)
+            twobodyterm.create_2bo()
+            twobodyterm.normalorder()
+            twobodyterm.decouple()
+            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+            for iterm in range(len(dc_coeff_array)):
+                if dc_dens_array[iterm][0]=="NODENS":
+                    for ispin in range(2):
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
+                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
+                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                    
+        # f+c terms, x and y
+        for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
+            firstop=phonons.onebody_op("f",phononterm[0])
+            firstop.create_1bo()
+            secondop=phonons.onebody_op("c",phononterm[1])
+            secondop.create_1bo()
+            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22)
+            twobodyterm.create_2bo()
+            twobodyterm.normalorder()
+            twobodyterm.decouple()
+            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+            for iterm in range(len(dc_coeff_array)):
+                if dc_dens_array[iterm][0]=="NODENS":
+                    for ispin in range(2):
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
+                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
+                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                else:
+                    for ispin in range(2):
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
+                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
+                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+                        
+        # c+c terms, x and y
+        for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
+            firstop=phonons.onebody_op("c",phononterm[0])
+            firstop.create_1bo()
+            secondop=phonons.onebody_op("c",phononterm[1])
+            secondop.create_1bo()
+            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll)
+            twobodyterm.create_2bo()
+            twobodyterm.normalorder()
+            twobodyterm.decouple()
+            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+            for iterm in range(len(dc_coeff_array)):
+                if dc_dens_array[iterm][0]=="NODENS":
+                    for ispin in range(2):
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
+                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
+                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                else:
+                    for ispin in range(2):
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
+                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
+                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
         
         
         ######################
