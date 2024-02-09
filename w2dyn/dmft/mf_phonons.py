@@ -127,7 +127,7 @@ class twobody_op:
             (b.elec_orb == d.elec_orb) and\
             (b.elec_type == d.elec_type):
                 pass
-            elif (a.dagger == False) and (c.dagger == False) and\
+            elif (a.dagger == True) and (c.dagger == True) and\
             (a.elec_valley == c.elec_valley) and\
             (a.elec_orb == c.elec_orb) and\
             (a.elec_type == c.elec_type):
