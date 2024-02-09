@@ -93,7 +93,7 @@ for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
    
    
    
-if True:       
+if False:       
     tmp_dc_full=np.real(tmp_dc_full)       
     for i in range(12):
         print(str(tmp_dc_full[i,0,0,0])+"  "+str(tmp_dc_full[i,0,1,0])+"  "+str(tmp_dc_full[i,0,2,0])+"  "+str(tmp_dc_full[i,0,3,0])+"  "+str(tmp_dc_full[i,0,4,0])+"  "+str(tmp_dc_full[i,0,5,0])+"  "+str(tmp_dc_full[i,0,6,0])+"  "+str(tmp_dc_full[i,0,7,0])+"  "+str(tmp_dc_full[i,0,8,0])+"  "+str(tmp_dc_full[i,0,9,0])+"  "+str(tmp_dc_full[i,0,10,0])+"  "+str(tmp_dc_full[i,0,11,0]))
@@ -122,14 +122,15 @@ if False:
 
 
 
-if False:
+if True:
 
     firstop=phonons.onebody_op("f",ph.VfX)
     firstop.create_1bo()
-    secondop=phonons.onebody_op("c",ph.VcX)
+    secondop=phonons.onebody_op("f",ph.VfX)
     secondop.create_1bo()
     twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll)
     twobodyterm.create_2bo()
     twobodyterm.normalorder()
+    twobodyterm.prettyprint()
     twobodyterm.decouple()
-    twobodyterm.prettyprint_decoupled()
+    #twobodyterm.prettyprint_decoupled()
