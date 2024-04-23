@@ -265,7 +265,7 @@ class DMFTStep:
                 dens = self.get_loc_imp_mixdens()
                 #FIXME: put a kick in the density at the beginning
                 if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
-                    print("Adding dc kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
+                    print("Adding dc kick for ",self.niter_kick + 1," steps out of ",self.sigma_kick_persist)
                     if self.niter_kick == 0:
                         self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
                         #itmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
@@ -274,6 +274,10 @@ class DMFTStep:
                         #    self.mpi_comm.bcast(tmpmat, root=0)
                         tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
                         np.fill_diagonal(tmpmat,0.0)
+                        #tmpmat[0:2,8:12]=0.0
+                        #tmpmat[2:4,4:8]=0.0
+                        #tmpmat[8:12,0:2]=0.0
+                        #tmpmat[4:8,2:4]=0.0
                         for ispin in range(nspins):
                             self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
                     dens += self.sigma_kick_mat

@@ -91,7 +91,7 @@ for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
                 dens_jindex = orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
                 tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
    
-   
+tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])   
    
 if False:       
     tmp_dc_full=np.real(tmp_dc_full)       
@@ -100,21 +100,20 @@ if False:
 
 if False: 
     print(" ")
-    tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])
     tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0])      
     for i in range(12):
         print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
 
-if False: 
+if True: 
     print(" ")
-
+    tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0]) 
     for i in range(12):
         for j in range(12):
             if tmp_dc_full_bak[i,j] != 0:
                 tmp_dc_full[i,j]=1
             else:
                 tmp_dc_full[i,j]=0
-                
+    tmp_dc_full=np.real(tmp_dc_full)            
     for i in range(12):
         print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
 
@@ -122,7 +121,7 @@ if False:
 
 
 
-if True:
+if False:
 
     firstop=phonons.onebody_op("f",ph.VfX)
     firstop.create_1bo()
@@ -133,4 +132,5 @@ if True:
     twobodyterm.normalorder()
     twobodyterm.prettyprint()
     twobodyterm.decouple()
+    print(np.imag(ph.VcY))
     #twobodyterm.prettyprint_decoupled()
