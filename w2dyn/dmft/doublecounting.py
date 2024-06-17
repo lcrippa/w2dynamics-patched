@@ -294,7 +294,7 @@ class Wterm(SelfConsistent):
         # W and V terms #
         #################
         
-        if False: #this is the current convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
+        if False: #this is the old convention
             shifts = np.array(self.shifts)
             diag_dc = []
             for atom in self.atom_list:
@@ -328,7 +328,7 @@ class Wterm(SelfConsistent):
                             index_c = self.orbvalley_index(iorb_c,ival_c,"c")
                             tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
 
-            #W term 3 (S284) This is the Fock term, which for now we don't consider
+            #W term 3 (S284) This is the Fock term
             if True:
                 for ispin in range(2):
                     for jspin in range(2):
