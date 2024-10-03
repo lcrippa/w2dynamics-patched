@@ -349,7 +349,7 @@ class Wterm(SelfConsistent):
         # J term # 
         ##########
         
-        #(S290)
+        #(S288)
         
         for iorb in range(2):
             for ivalley in range(2):
@@ -357,22 +357,22 @@ class Wterm(SelfConsistent):
                 c_index_1 = self.orbvalley_index_j(iorb,ivalley,"c")
                 f_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"f")
                 c_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"c")
-                for ispin in range(2):
-                    for jspin in range(2):
+                for s1 in range(2):
+                    for s2 in range(2):
                         #term 1 (S288)
-                        tmp_dc_full[f_index_1,ispin,f_index_1,jspin] += -1.0 * self.j * (densities[c_index_1,jspin,c_index_1,ispin] - 0.5*(ispin == jspin))
+                        tmp_dc_full[f_index_1,s1,f_index_1,s2] += -1.0 * self.j * (densities[c_index_1,s2,c_index_1,s1] - 0.5*(s1 == s2))
                         #term 2 (S288)
-                        tmp_dc_full[c_index_1,ispin,c_index_1,jspin] += -1.0 * self.j * (densities[f_index_1,jspin,f_index_1,ispin] - 0.5*(ispin == jspin))
+                        tmp_dc_full[c_index_1,s2,c_index_1,s1] += -1.0 * self.j * (densities[f_index_1,s1,f_index_1,s2] - 0.5*(s1 == s2))
                         #term 3 (S288)
-                        tmp_dc_full[c_index_2,ispin,c_index_1,jspin] += self.j * densities[f_index_1,jspin,f_index_2,ispin]
+                        tmp_dc_full[c_index_2,s2,c_index_1,s1] += self.j * densities[f_index_1,s1,f_index_2,s2]
                         #term 4 (S288)
-                        tmp_dc_full[f_index_1,ispin,f_index_2,jspin] += self.j * densities[c_index_2,jspin,c_index_1,ispin]
+                        tmp_dc_full[f_index_1,s1,f_index_2,s2] += self.j * densities[c_index_2,s2,c_index_1,s1]
                         #term 5 (S288)
-                        tmp_dc_full[f_index_1,ispin,c_index_1,ispin] += self.j * densities[c_index_1,jspin,f_index_1,jspin]
-                        tmp_dc_full[c_index_1,ispin,f_index_1,ispin] += self.j * densities[c_index_1,jspin,f_index_1,jspin]
+                        tmp_dc_full[f_index_1,s1,c_index_1,s1] += self.j * densities[c_index_1,s2,f_index_1,s2]
+                        tmp_dc_full[c_index_1,s1,f_index_1,s1] += self.j * densities[c_index_1,s2,f_index_1,s2]
                         #term 6 (S288)
-                        tmp_dc_full[f_index_1,ispin,c_index_1,ispin] += -1.0 * self.j * densities[c_index_2,jspin,f_index_2,jspin]
-                        tmp_dc_full[c_index_1,ispin,f_index_1,ispin] += -1.0 * self.j * densities[c_index_2,jspin,f_index_2,jspin]     
+                        tmp_dc_full[f_index_1,s1,c_index_1,s1] += -1.0 * self.j * densities[c_index_2,s2,f_index_2,s2]
+                        tmp_dc_full[c_index_1,s1,f_index_1,s1] += -1.0 * self.j * densities[c_index_2,s2,f_index_2,s2]     
 
         ################################
         # Phonons mean-field decoupled #
