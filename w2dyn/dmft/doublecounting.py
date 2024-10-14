@@ -235,7 +235,7 @@ class Wterm(SelfConsistent):
         self.u2 = u2
         self.w = w
         self.v = v
-        self.j = j
+        self.jj = j
         self.shifts = shifts
         self.ll = ll
         self.a22 = a22
@@ -294,7 +294,7 @@ class Wterm(SelfConsistent):
         # W and V terms #
         #################
         
-        if False: #this is the old convention
+        if False: #this is the current convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
             shifts = np.array(self.shifts)
             diag_dc = []
             for atom in self.atom_list:
@@ -328,7 +328,7 @@ class Wterm(SelfConsistent):
                             index_c = self.orbvalley_index(iorb_c,ival_c,"c")
                             tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
 
-            #W term 3 (S284) This is the Fock term
+            #W term 3 (S284) This is the Fock term, which for now we don't consider
             if True:
                 for ispin in range(2):
                     for jspin in range(2):
@@ -349,30 +349,111 @@ class Wterm(SelfConsistent):
         # J term # 
         ##########
         
-        #(S288)
+        #(S288) of the PRL
         
-        for iorb in range(2):
-            for ivalley in range(2):
-                f_index_1 = self.orbvalley_index_j(iorb,ivalley,"f")
-                c_index_1 = self.orbvalley_index_j(iorb,ivalley,"c")
-                f_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"f")
-                c_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"c")
-                for s1 in range(2):
-                    for s2 in range(2):
-                        #term 1 (S288)
-                        tmp_dc_full[f_index_1,s1,f_index_1,s2] += -1.0 * self.j * (densities[c_index_1,s2,c_index_1,s1] - 0.5*(s1 == s2))
-                        #term 2 (S288)
-                        tmp_dc_full[c_index_1,s2,c_index_1,s1] += -1.0 * self.j * (densities[f_index_1,s1,f_index_1,s2] - 0.5*(s1 == s2))
-                        #term 3 (S288)
-                        tmp_dc_full[c_index_2,s2,c_index_1,s1] += self.j * densities[f_index_1,s1,f_index_2,s2]
-                        #term 4 (S288)
-                        tmp_dc_full[f_index_1,s1,f_index_2,s2] += self.j * densities[c_index_2,s2,c_index_1,s1]
-                        #term 5 (S288)
-                        tmp_dc_full[f_index_1,s1,c_index_1,s1] += self.j * densities[c_index_1,s2,f_index_1,s2]
-                        tmp_dc_full[c_index_1,s1,f_index_1,s1] += self.j * densities[c_index_1,s2,f_index_1,s2]
-                        #term 6 (S288)
-                        tmp_dc_full[f_index_1,s1,c_index_1,s1] += -1.0 * self.j * densities[c_index_2,s2,f_index_2,s2]
-                        tmp_dc_full[c_index_1,s1,f_index_1,s1] += -1.0 * self.j * densities[c_index_2,s2,f_index_2,s2]     
+        if False:
+            for iorb in range(2):
+                for ivalley in range(2):
+                    f_index_1 = self.orbvalley_index_j(iorb,ivalley,"f")
+                    c_index_1 = self.orbvalley_index_j(iorb,ivalley,"c")
+                    f_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"f")
+                    c_index_2 = self.orbvalley_index_j(not(iorb),not(ivalley),"c")
+                    for s1 in range(2):
+                        for s2 in range(2):
+                            #term 1 (S288)
+                            tmp_dc_full[f_index_1,s1,f_index_1,s2] += -1.0 * self.jj * (densities[c_index_1,s2,c_index_1,s1] - 0.5*(s1 == s2))
+                            #term 2 (S288)
+                            tmp_dc_full[c_index_1,s2,c_index_1,s1] += -1.0 * self.jj * (densities[f_index_1,s1,f_index_1,s2] - 0.5*(s1 == s2))
+                            #term 3 (S288)
+                            tmp_dc_full[c_index_2,s2,c_index_1,s1] += self.jj * densities[f_index_1,s1,f_index_2,s2]
+                            #term 4 (S288)
+                            tmp_dc_full[f_index_1,s1,f_index_2,s2] += self.jj * densities[c_index_2,s2,c_index_1,s1]
+                            #term 5 (S288)
+                            tmp_dc_full[f_index_1,s1,c_index_1,s1] += self.jj * densities[c_index_1,s2,f_index_1,s2]
+                            tmp_dc_full[c_index_1,s1,f_index_1,s1] += self.jj * densities[c_index_1,s2,f_index_1,s2]
+                            #term 6 (S288)
+                            tmp_dc_full[f_index_1,s1,c_index_1,s1] += -1.0 * self.jj * densities[c_index_2,s2,f_index_2,s2]
+                            tmp_dc_full[c_index_1,s1,f_index_1,s1] += -1.0 * self.jj * densities[c_index_2,s2,f_index_2,s2]    
+        else:
+            #Here we try in the way we wrote it in the PRX supplementary or equivalently Haoyu's PRL
+            Jmatrix = np.zeros_like(tmp_dc_full)
+            
+            #First term of S16
+            for iorb in range(2):
+                for jorb in range(2):
+                    for ival in range(2):
+                        for jval in range(2):
+                            for ispin in range(2):
+                                for jspin in range(2):
+                                    ival_sign = (-1)**ival #valley 1 is plus valley, valley 2 is minus valley
+                                    jval_sign = (-1)**jval
+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) ) #+1 because python indexes start from 0, but it makes no difference
+                                    
+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
+                                                                        
+                                    Jmatrix[i_f,ispin,j_f,jspin] *= 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
+
+            #Second term of S16
+            for iorb in range(2):
+                for jorb in range(2):
+                    for ival in range(2):
+                        for jval in range(2):
+                            for ispin in range(2):
+                                for jspin in range(2):
+                                    ival_sign = (-1)**ival
+                                    jval_sign = (-1)**jval
+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) )
+                                    
+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
+                                    
+                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
+
+            #Define V3 and V4, (S17) and (S18):
+            V3 = 0.0
+            for iorb in range(2):
+                for ival in range(2):
+                    for ispin in range(2):
+                        signval = (-1) ** ival
+                        deltaval = signval * (-1) ** (iorb + 2) #not +1, because python index starts from 0
+                        i_f = self.orbvalley_index_j(iorb,ival,"f")
+                        i_c = self.orbvalley_index_j(iorb,ival,"c")
+                        V3 += densities[i_f,ispin,i_c,ispin] * (1 == deltaval)
+
+            V4 = 0.0
+            for iorb in range(2):
+                for ival in range(2):
+                    for ispin in range(2):
+                        signval = (-1) ** ival
+                        deltaval = signval * (-1) ** (iorb + 2) #not +1, because python index starts from 0
+                        i_f = self.orbvalley_index_j(iorb,ival,"f")
+                        i_c = self.orbvalley_index_j(iorb,ival,"c")
+                        V4 += densities[i_f,ispin,i_c,ispin] * (-1 == deltaval)
+
+            #(S19)
+            for iorb in range(2):
+                for ival in range(2):
+                    for ispin in range(2):
+                        deltaval = signval * (-1) ** (iorb + 2) #not +1, because python index starts from 0
+                        i_f = self.orbvalley_index_j(iorb,ival,"f")
+                        i_c = self.orbvalley_index_j(iorb,ival,"c")
+                        #firt term
+                        Jmatrix[i_f,ispin,i_c,ispin] += self.jj * np.conj(V3) * (1 == deltaval) 
+                        #second term
+                        Jmatrix[i_f,ispin,i_c,ispin] += self.jj * np.conj(V4) * (-1 == deltaval) 
+                        # h.c. of first term
+                        Jmatrix[i_c,ispin,i_f,ispin] += self.jj * V3 * (1 == deltaval) 
+                        #second term
+                        Jmatrix[i_c,ispin,i_f,ispin] += self.jj * V4 * (-1 == deltaval) 
+
+            #Sum the J matrix to the DC
+            tmp_dc_full += Jmatrix 
+
 
         ################################
         # Phonons mean-field decoupled #
