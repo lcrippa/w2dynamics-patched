@@ -14,7 +14,7 @@ endif(POLICY CMP0074)
 SET(VERSION 1.0)
 
 # Set the module path, so that CMake also considers our modules
-SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+SET(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules/")
 
 # Uncomment if it is required that Fortran 90 is supported
 IF(NOT CMAKE_Fortran_COMPILER_SUPPORTS_F90)
@@ -82,6 +82,7 @@ if (USE_NFFT)
     # in the previous findPackage(NFFT) call an old version of NFFT could have been found. Here we override it with our up-to-date self-compiled version. We don't use the include directories.
     set(NFFT_LIBRARIES ${PROJECT_BINARY_DIR}/nfft_local/lib/libnfft3.a)
     add_library(nfft STATIC IMPORTED)
+    target_link_libraries(nfft INTERFACE ${FFTW_LIBRARIES})
     set_target_properties(nfft PROPERTIES IMPORTED_LOCATION ${NFFT_LIBRARIES})
     add_dependencies(nfft nfft_local)
   endif(NOT NFFT_FOUND)
@@ -90,14 +91,38 @@ else ()
   set(NFFT_LIBRARIES "")
 endif ()
 
-find_package(NUMPY 1.10)
+find_package(NUMPY 1.18)
 IF(NOT NUMPY_FOUND)
-    install_via_pip("numpy>=1.10.0" ERRORCODE)
+    install_via_pip("numpy>=1.18" ERRORCODE)
     if (${ERRORCODE})
     MESSAGE(FATAL_ERROR "Couldn't install numpy -> ABORTING!!!")
     endif()
 ENDIF()
 
+find_package(
+  Python
+  COMPONENTS Interpreter Development.Module NumPy
+  REQUIRED)
+
+# F2PY headers
+execute_process(
+  COMMAND "${PYTHON_EXECUTABLE}" -c
+          "import numpy.f2py; print(numpy.f2py.get_include())"
+  RESULT_VARIABLE GET_INCLUDE_FAILED
+  OUTPUT_VARIABLE F2PY_INCLUDE_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (${GET_INCLUDE_FAILED})
+  execute_process(
+    COMMAND "${PYTHON_EXECUTABLE}" -c
+            "import numpy.f2py; print(numpy.f2py.__path__[0] + '/src')"
+    OUTPUT_VARIABLE F2PY_INCLUDE_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+endif(${GET_INCLUDE_FAILED})
+
+add_library(fortranobject OBJECT "${F2PY_INCLUDE_DIR}/fortranobject.c")
+target_link_libraries(fortranobject PUBLIC Python::NumPy)
+target_include_directories(fortranobject PUBLIC "${F2PY_INCLUDE_DIR}")
+set_property(TARGET fortranobject PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 find_package(H5PY)
 
@@ -136,16 +161,14 @@ if(NOT CONFIGOBJ_FOUND)
     MESSAGE(FATAL_ERROR "Couldn't install configobj(required for DMFT.py) -> ABORTING!!!")
     endif()
 endif()
-#set up some common F2PY Variables
-INCLUDE(${CMAKE_MODULE_PATH}/SetupF2Py.cmake)
 
 # Define the executable name
 SET(CTQMCEXE ctqmc)
 
 # Define some directories
-SET(SRC ${CMAKE_SOURCE_DIR}/src)
+SET(SRC ${PROJECT_SOURCE_DIR}/src)
 SET(LIB ${CMAKE_CURRENT_BINARY_DIR}/lib)
-#SET(BIN ${CMAKE_SOURCE_DIR}/bin)
+#SET(BIN ${PROJECT_SOURCE_DIR}/bin)
 
 SET(SRCCTQMC ${SRC}/ctqmc_fortran)
 SET(SRCMAXENT ${SRC}/maxent)
@@ -163,7 +186,7 @@ ADD_SUBDIRECTORY(${SRCMAXENT})
 
 # Add a distclean target to the Makefile
 ADD_CUSTOM_TARGET(distclean 
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/distclean.cmake
+    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/distclean.cmake
 )
 
 ADD_SUBDIRECTORY(testsuite/mtrng.tests)
@@ -222,9 +245,6 @@ endif()
 option(INSTALL_EXECUTABLES "Install executable scripts DMFT.py, cthyb, Maxent.py and hgrep to the executable directory (depends on prefix, e.g. /usr/bin)" ON)
 
 message(STATUS "Installing executable scripts DMFT.py, cthyb, Maxent.py, hgrep (option INSTALL_EXECUTABLES): ${INSTALL_EXECUTABLES}")
-
-# Compile all Python files to bytecode
-install(SCRIPT PyCompileall.txt)
 
 install(DIRECTORY w2dyn
   DESTINATION "${INSTALL_PATH_SITE_PACKAGES}"

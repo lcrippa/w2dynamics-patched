@@ -39,16 +39,16 @@ Installation
 
 Requirements:
 
-  - [Python](https://www.python.org/) (>= 2.6)
+  - [Python](https://www.python.org/) (>= 3.?)
   - Fortran 90 compiler, e.g. [GCC](https://gcc.gnu.org/)
   - C++11 compiler, e.g. [GCC](https://gcc.gnu.org/)
-  - [CMake](https://cmake.org/) (>= 2.8.5)
+  - [CMake](https://cmake.org/) (>= 3.18)
   - [BLAS](https://www.netlib.org/blas/), ideally an optimized version as provided e.g. by [OpenBLAS](https://www.openblas.net/) or [Intel MKL](https://software.intel.com/mkl)
   - [LAPACK](https://www.netlib.org/lapack/), ideally an optimized version as provided e.g. by [OpenBLAS](https://www.openblas.net/) or [Intel MKL](https://software.intel.com/mkl)
 
 Further dependencies (automatically installed if not found):
 
-  - Python packages: [numpy](https://pypi.org/project/numpy/) >= 1.10, [scipy](https://pypi.org/project/scipy/) >= 0.10, [h5py](https://pypi.org/project/h5py/), [mpi4py](https://pypi.org/project/mpi4py/), [configobj](https://pypi.org/project/configobj/)
+  - Python packages: [numpy](https://pypi.org/project/numpy/) >= 1.18, [scipy](https://pypi.org/project/scipy/) >= 0.10, [h5py](https://pypi.org/project/h5py/), [mpi4py](https://pypi.org/project/mpi4py/), [configobj](https://pypi.org/project/configobj/)
   - [NFFT3](https://www-user.tu-chemnitz.de/~potts/nfft/) (for automatic building, its dependency [FFTW3](http://www.fftw.org/) is required)
   - [HDF5](https://www.hdfgroup.org/solutions/hdf5) (as a dependency of h5py)
 
