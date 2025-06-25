@@ -1,0 +1,22 @@
+[General]
+DOS = EDcheck
+half-bandwidth = 1,
+beta = 26
+mu = 0.5
+NAt = 1
+DMFTsteps = 1
+FileNamePrefix = ed-twopart
+magnetism = para
+[Atoms]
+[[1]]
+Nd = 1
+Hamiltonian = Kanamori
+Udd = 1.0
+QuantumNumbers = Nt Szt Qzt
+[QMC]
+Nwarmups = 500000
+Nmeas = 5000000
+NCorr = 100
+truncation = 2
+Ntau = 500
+Niw = 2000

@@ -1,0 +1,9 @@
+bcfg with     4 ops
+creators:
+  iop        tau orb sp
+    1  10.2872962 1 2
+    2  12.9668301 1 2
+annihilators:
+  iop        tau orb sp
+    1   9.5845894 1 2
+    2  11.2104195 1 2

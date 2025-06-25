@@ -1,0 +1,34 @@
+
+[General]
+DOS = EDcheck
+half-bandwidth = 2.0, 4.0
+muimpFile = w2dlevels.dat
+beta = 100.0
+EPSN = 0.0
+NAt = 1
+DMFTsteps = 0
+StatisticSteps = 1
+FileNameFormat = "{prefix}.hdf5"
+FileNamePrefix = 2orb_bws2.0_4.0_lvls0.0_kanU8.0_J2.0_mu7.0
+mixing = 0.2
+magnetism = para
+FTType = none
+[Atoms]
+[[1]]
+Nd = 2
+Hamiltonian = Kanamori
+Udd = 8.0
+Jdd = 2.0
+Vdd = 4.0
+QuantumNumbers = Nt Szt Qzt
+[QMC]
+TaudiffMax = 3.5
+Nwarmups = 20000
+Nmeas = 300
+NCorr = 270
+Ntau = 2000
+Niw = 2000
+Nftau = 2000
+NLegMax = 1
+NLegOrder = 1
+MeasGiw = 1

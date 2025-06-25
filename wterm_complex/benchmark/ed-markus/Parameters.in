@@ -1,0 +1,29 @@
+[General]
+DOS = EDcheck
+half-bandwidth = 1, 1
+beta = 3
+mu = 0.65
+NAt = 1
+DMFTsteps = 0
+StatisticSteps = 1
+FileNamePrefix = test
+magnetism=para
+FTType=legendre
+
+[Atoms]
+[[1]]
+Nd = 1
+Hamiltonian = Density
+Udd = 1.3
+QuantumNumbers = Nt Szt Azt
+
+[QMC]
+Nwarmups = 500000
+Nmeas = 500101
+NCorr = 10
+Ntau = 500
+Niw = 500
+TaudiffMax = 3
+Percentage4OperatorMove = 0.22
+#PercentageTauShiftMove = 0.005
+#PercentageOuterMove = 0.15

@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.9...3.31)
+
+set(CMAKE_MODULE_PATH "cmake/Modules/")
+
+include(PythonPolyfill)
+find_python_interpreter()
+
+include(installviapip)
+install_via_pip("pylint" ERRORCODE)
+
+execute_process(COMMAND ${Python3_EXECUTABLE} -m pylint cthyb DMFT hgrep Maxent w2dyn
+                RESULT_VARIABLE PYLINT_EXITCODE)
+
+if (${PYLINT_EXITCODE})
+   message(FATAL_ERROR "Pylint emitted diagnostics of class error: Please fix or suppress indicated issues!")
+endif()

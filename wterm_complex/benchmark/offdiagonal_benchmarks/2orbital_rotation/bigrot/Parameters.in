@@ -1,0 +1,39 @@
+#asdf
+[General]
+DOS = ReadInSO
+HkFile = Hk_simplecubic_rot.dat
+beta = 10
+mu = 1.0
+totdens = 1.0
+EPSN = 0.00
+DMFTsteps = 12
+magnetism = ferro
+mixing = 0.5
+readold = 0
+fileold = asdf
+FileNamePrefix = offd
+FTType = legendre
+[Atoms]
+[[1]]
+Nd = 2
+Hamiltonian = Kanamori
+QuantumNumbers = Nt Szt Qzt
+Udd = 2.0
+Jdd = 0.5
+Vdd = 1.0
+[QMC]
+Nwarmups = 1000000
+Nmeas = 50000
+NCorr = 100
+PercentageGlobalMove = 0.005
+truncation = 6
+Ntau = 250
+Nftau = 4002
+Niw = 2000
+NLegMax = 40
+NLegOrder = 40
+MeasDensityMatrix = 0
+Eigenbasis = 1
+segment=0
+offdiag=1
+Percentage4OperatorMove=0.2

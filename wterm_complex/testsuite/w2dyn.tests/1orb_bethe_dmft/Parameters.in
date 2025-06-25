@@ -1,0 +1,32 @@
+[General]
+DOS = Bethe
+half-bandwidth = 1.0
+beta = 30.0
+totdens = 1.0
+EPSN = 0.00000001
+NAt = 1
+DMFTsteps = 2
+StatisticSteps = 0
+FileNameFormat = "{prefix}.hdf5"
+FileNamePrefix = 1orb_bethe_dmft
+mixing = 0.35
+magnetism = para
+FTType = none
+[Atoms]
+[[1]]
+Nd = 1
+Hamiltonian = Kanamori
+Udd = 3.0
+Jdd = 0.75
+Vdd = 1.5
+QuantumNumbers = Nt Szt Qzt
+[QMC]
+Nwarmups = 20000
+Nmeas = 300
+NCorr = 270
+Ntau = 2000
+Niw = 2000
+Nftau = 2000
+NLegMax = 1
+NLegOrder = 1
+MeasGiw = 1

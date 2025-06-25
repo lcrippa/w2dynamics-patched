@@ -1,0 +1,78 @@
+cmake_minimum_required(VERSION 3.9...3.31)
+
+function(declare_test binary_file src_file)
+    # Add the executable for the test case
+    add_executable(${binary_file} ${src_file})
+
+    # Link the proper libraries
+    set_target_properties(${binary_file} PROPERTIES LINKER_LANGUAGE Fortran)
+    target_link_libraries(${binary_file} CTQMC)
+    target_link_libraries(${binary_file} ${Python3_LIBRARIES})
+    target_link_libraries(${binary_file} ${LAPACK_LIBRARIES})
+    target_link_libraries(${binary_file} FFTW::FFTW)
+
+    # Add the test case
+    add_test(${binary_file} ${binary_file})
+endfunction()
+
+function(add_test_aux_file filename)
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/${filename}
+        ${CMAKE_CURRENT_BINARY_DIR}/${filename}
+        COPYONLY)
+endfunction()
+
+
+enable_testing()
+
+declare_test(1-rng-basic-call 1-rng-basic-call.F90)
+declare_test(1-testing 1-testing.F90)
+declare_test(2-rng-check 2-rng-check.F90)
+declare_test(2-prng 2-prng.F90)
+declare_test(3-exp-discretization 3-exp-discretization.F90)
+declare_test(4-init-bath 4-init-bath.F90)
+declare_test(6-bathglobal-vs-bathadd 6-bathglobal-vs-bathadd.F90)
+declare_test(7-bathglobal-vs-bathrem 7-bathglobal-vs-bathrem.F90)
+declare_test(8-bathglobal-vs-bathshift 8-bathglobal-vs-bathshift.F90)
+declare_test(8.5-bathglobal-vs-bathreplace 8.5-bathglobal-vs-bathreplace.F90)
+declare_test(11-wormstate-hybop-operations 11-wormstate-hybop-operations.F90)
+declare_test(12-binarysearch-taupos 12-binarysearch-taupos.F90)
+declare_test(15-local-cycle 15-local-cycle.F90)
+declare_test(16-operators 16-operators.F90)
+declare_test(16-braket 16-braket.F90)
+declare_test(17-accumulators 17-accumulators.F90)
+declare_test(18-impurity 18-impurity.F90)
+declare_test(19-bathglobal-vs-bathadd4 19-bathglobal-vs-bathadd4.F90)
+declare_test(20-bathglobal-vs-bathrem4 20-bathglobal-vs-bathrem4.F90)
+declare_test(21-sampler 21-sampler.F90)
+declare_test(22-complex-hyb-bug 22-complex-hyb-bug.F90)
+declare_test(23-extrange 23-extrange.F90)
+declare_test(24-hybridization 24-hybridization.F90)
+declare_test(25-sparse-index 25-sparse-index.F90)
+declare_test(26-updatable-matrix 26-updatable-matrix.F90)
+declare_test(26-qr-updates 26-qr-updates.F90)
+declare_test(27-permutation 27-permutation.F90)
+declare_test(28-blockmatrix 28-blockmatrix.F90)
+declare_test(31-ed-check 31-ed-check.F90)
+declare_test(32-multiorb 32-multiorb.F90)
+
+add_test_aux_file(ftau.dat)
+add_test_aux_file(ftau2.dat)
+add_test_aux_file(ftau3.dat)
+add_test_aux_file(ftau4.dat)
+add_test_aux_file(b3.dat)
+add_test_aux_file(b4.dat)
+add_test_aux_file(b5.dat)
+add_test_aux_file(b6.dat)
+add_test_aux_file(b7.dat)
+add_test_aux_file(b8.dat)
+add_test_aux_file(b9.dat)
+add_test_aux_file(b10.dat)
+add_test_aux_file(b11.dat)
+add_test_aux_file(b12.dat)
+add_test_aux_file(b13.dat)
+add_test_aux_file(b14.dat)
+add_test_aux_file(b15.dat)
+add_test_aux_file(b16.dat)
+add_test_aux_file(u_matrix.dat)
+add_test_aux_file(muimp.dat)

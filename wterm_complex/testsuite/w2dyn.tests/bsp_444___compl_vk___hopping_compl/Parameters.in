@@ -1,0 +1,60 @@
+#asdf
+[General]
+DOS = readDeltafromMarkusED
+beta = 25.0
+mu = 0.0
+NAt = 1
+DMFTsteps = 0
+StatisticSteps = 1
+FileNameFormat = "{prefix}.hdf5"
+FileNamePrefix = bsp_444___compl_vk___hopping_compl
+muimpFile = e0
+fiwFile = fiw.dat
+ftauFile = ftau.dat
+#muimpFile = e0
+#fiwFile = fiw.dat
+#ftauFile = ftau.dat
+magnetism=ferro
+FTType=legendre
+[Atoms]
+[[1]]
+Nd = 1
+Hamiltonian = Kanamori
+Udd = 0.0
+Jdd = 0.0
+Vdd = 0.0
+QuantumNumbers = Nt All
+[QMC]
+Nwarmups = 30000
+Nmeas = 300
+#Nmeas = 1
+NCorr = 100
+#truncation = 5
+Ntau = 100
+Nftau = 2003
+Niw = 2000
+NLegMax = 25
+NLegOrder = 25
+Eigenbasis=1
+PercentageGlobalMove=0.005
+#segment=1
+#MeasSusz=0
+MeasDensityMatrix=1
+offdiag=1
+#complex = 1
+complexHyb = 1
+complexLocTr = 1
+#use_phase=1
+#offd_strength=0.0
+#debug=1
+Percentage4OperatorMove=0.005
+#full_det=0
+#lookup=1
+#n_lookup=1000
+#MeasGiw=0
+TaudiffMax = 5
+
+##NSeed=43896
+NSeed = 43890
+
+#full_offdiag2 = 1

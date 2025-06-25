@@ -1,0 +1,17 @@
+beta 25
+int-type general
+u-value 2.0
+j-value 0.0
+v-value 0.0
+mu 0.5
+eloc e0
+nflavours 2
+bath-e epsk
+bath-v vk
+niwf 2000
+ntau 300
+steps 200000
+sweep-size 100
+warmup .10
+#int-type density
+#hybr-shape diagonal
