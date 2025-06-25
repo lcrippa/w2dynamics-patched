@@ -513,19 +513,19 @@ class Wterm(SelfConsistent):
         ######################
         
         #rotate the DC to the band basis! this is where we do the calculations
-        print("      ")
-        print("Before rotation:")
-        for row in tmp_dc_full[:,0,:,0]:
-            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
-        print("      ")
+        #print("      ")
+        #print("Before rotation:")
+        #for row in tmp_dc_full[:,0,:,0]:
+        #    print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
+        #print("      ")
 
         tmp_dc_full = self.rotate_to_bandbasis(tmp_dc_full)
        
-        print("      ")
-        print("After rotation:")
-        for row in tmp_dc_full[:,0,:,0]:
-            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
-        print("      ")
+        #print("      ")
+        #print("After rotation:")
+        #for row in tmp_dc_full[:,0,:,0]:
+        #    print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
+        #print("      ")
 
        
         #set numerically small elements to 0
