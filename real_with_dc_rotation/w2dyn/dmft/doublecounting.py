@@ -302,7 +302,7 @@ class Wterm(SelfConsistent):
 
         densities = self.rotate_to_orbbasis(densities)
 
-        densities = np.real(densities)
+        #densities = np.real(densities)
         diagonal_densities = orbspin.extract_diagonal(densities)
         shifts = np.array(self.shifts)
         tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))*1j
