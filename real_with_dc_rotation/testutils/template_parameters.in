@@ -1,0 +1,56 @@
+#Parameters.in
+[General]
+DOS = ReadIn
+HkFile = ../hk_weighted_2valleys.dat
+beta = 1.000000
+NAt = 1
+magnetism = para
+totdens = 11.000000
+EPSN = 0.000001
+DMFTsteps = 80
+FileNamePrefix = dmft_blg
+fileold = almost_converged_2.hdf5
+readold = -1 
+#mu_search = kappa
+mixing = 0.5
+mu_mixing = 0.5
+dc_mixing_strategy = linear
+dc_mixing = 0.5
+dc_subblock = 4
+dc_subblock_step = 2
+dc_rest_step = 2
+
+EPSEQ=0.001
+dc = Wterm
+Wterm_U2	= 2.329
+Wterm_W         = 44.03,44.03,50.20,50.20
+Wterm_V         = 48.33
+Wterm_J         = 0.0
+Wterm_shifts    = -202.825, 0
+Wterm_ll        = 0.0
+Wterm_a22       = 0.0
+Wterm_a11       = 0.0
+Wterm_beta      = 0.0
+WriteFullLattice = 1
+
+[Atoms]
+[[1]]
+QuantumNumbers = Nt Szt All
+Hamiltonian = ReadUmatrix
+umatrix = u_matrix.dat
+Nd = 4
+Np = 8
+
+[QMC]
+Nwarmups = 200000
+Nmeas = 150000
+NCorr = 1500
+Niw = 2025
+Nftau = 1000
+Ntau = 500
+NLegMax = 40
+NLegOrder = 40
+TaudiffMax = 1.000000
+offdiag=0
+Percentage4OperatorMove=0.02
+MeasSusz=1
