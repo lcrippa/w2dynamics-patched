@@ -36,10 +36,12 @@ for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
     dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
     for iterm in range(len(dc_coeff_array)):
         if dc_dens_array[iterm][0]=="NODENS":
-            for ispin in range(2):
-                iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                jindex = orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+            # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+            ispin  = dc_op_array[iterm][2]
+            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+            jspin  = dc_op_array[iterm][6]
+            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
             
 # f+c terms, x and y
 for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
@@ -54,17 +56,23 @@ for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
     dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
     for iterm in range(len(dc_coeff_array)):
         if dc_dens_array[iterm][0]=="NODENS":
-            for ispin in range(2):
-                iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                jindex = orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+            # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+            ispin  = dc_op_array[iterm][2]
+            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+            jspin  = dc_op_array[iterm][6]
+            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
         else:
-            for ispin in range(2):
-                iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                jindex = orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
-                dens_jindex = orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
-                tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+            ispin  = dc_op_array[iterm][2]
+            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+            jspin  = dc_op_array[iterm][6]
+            
+            dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+            dens_ispin  = dc_dens_array[iterm][2]
+            dens_jindex = orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+            dens_jspin  = dc_dens_array[iterm][6]
+            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
                 
 # c+c terms, x and y
 for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
@@ -79,44 +87,41 @@ for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
     dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
     for iterm in range(len(dc_coeff_array)):
         if dc_dens_array[iterm][0]=="NODENS":
-            for ispin in range(2):
-                iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                jindex = orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+            ispin  = dc_op_array[iterm][2]
+            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+            jspin  = dc_op_array[iterm][6]
+            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
         else:
-            for ispin in range(2):
-                iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                jindex = orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
-                dens_jindex = orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
-                tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+            ispin  = dc_op_array[iterm][2]
+            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+            jspin  = dc_op_array[iterm][6]
+            
+            dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+            dens_ispin  = dc_op_array[iterm][2]
+            dens_jindex = orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+            dens_jspin  = dc_op_array[iterm][6]
+            
+            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
    
 tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])   
    
-if False:       
-    tmp_dc_full=np.real(tmp_dc_full)       
-    for i in range(12):
-        print(str(tmp_dc_full[i,0,0,0])+"  "+str(tmp_dc_full[i,0,1,0])+"  "+str(tmp_dc_full[i,0,2,0])+"  "+str(tmp_dc_full[i,0,3,0])+"  "+str(tmp_dc_full[i,0,4,0])+"  "+str(tmp_dc_full[i,0,5,0])+"  "+str(tmp_dc_full[i,0,6,0])+"  "+str(tmp_dc_full[i,0,7,0])+"  "+str(tmp_dc_full[i,0,8,0])+"  "+str(tmp_dc_full[i,0,9,0])+"  "+str(tmp_dc_full[i,0,10,0])+"  "+str(tmp_dc_full[i,0,11,0]))
+print("iband jband ispin jspin element")
 
-if False: 
-    print(" ")
-    tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0])      
-    for i in range(12):
-        print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
-
-if True: 
-    print(" ")
-    tmp_dc_full=tmp_dc_full[:,0,:,0]-np.transpose(tmp_dc_full[:,0,:,0]) 
-    for i in range(12):
-        for j in range(12):
-            if tmp_dc_full_bak[i,j] != 0:
-                tmp_dc_full[i,j]=1
-            else:
-                tmp_dc_full[i,j]=0
-    tmp_dc_full=np.real(tmp_dc_full)            
-    for i in range(12):
-        print(str(tmp_dc_full[i,0])+"  "+str(tmp_dc_full[i,1])+"  "+str(tmp_dc_full[i,2])+"  "+str(tmp_dc_full[i,3])+"  "+str(tmp_dc_full[i,4])+"  "+str(tmp_dc_full[i,5])+"  "+str(tmp_dc_full[i,6])+"  "+str(tmp_dc_full[i,7])+"  "+str(tmp_dc_full[i,8])+"  "+str(tmp_dc_full[i,9])+"  "+str(tmp_dc_full[i,10])+"  "+str(tmp_dc_full[i,11]))
-
+for iband in range(12):
+    for jband in range(12):
+        for ispin in range(2):
+            for jspin in range(2):
+                if ispin == 0:
+                    ispin_="↑"
+                else:
+                    ispin_="↓"
+                if jspin == 0:
+                    jspin_="↑"
+                else:
+                    jspin_="↓"
+                print(iband,jband,ispin_,jspin_,tmp_dc_full[iband,ispin,jband,jspin])
 
 
 

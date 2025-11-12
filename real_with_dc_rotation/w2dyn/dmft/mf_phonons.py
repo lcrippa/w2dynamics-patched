@@ -5,29 +5,39 @@ class phonon_1bo_params:
     def __init__(self,alpha,beta):
         self.alpha=alpha
         self.beta=beta
-        self.sigma_0=np.array([[1.0,0.0],[0.0,1.0]])
-        self.sigma_x=np.array([[0.0,1.0],[1.0,0.0]])
-        self.sigma_y=np.array([[0.0,-1j],[1j,0.0]])
-        self.sigma_z=np.array([[1.0,0.0],[0.0,-1.0]])
+        
+        #orbital
+        self.sigma_0 = np.array([[1.0,0.0],[0.0,1.0]])
+        self.sigma_x = np.array([[0.0,1.0],[1.0,0.0]])
+        self.sigma_y = np.array([[0.0,-1j],[1j,0.0]])
+        self.sigma_z = np.array([[1.0,0.0],[0.0,-1.0]])
+        
+        #valley
+        self.tau_0 = np.array([[1.0,0.0],[0.0,1.0]])
+        self.tau_x = np.array([[0.0,1.0],[1.0,0.0]])
+        self.tau_y = np.array([[0.0,-1j],[1j,0.0]])
+        self.tau_z = np.array([[1.0,0.0],[0.0,-1.0]])
 
-        self.tau_0=np.array([[1.0,0.0],[0.0,1.0]])
-        self.tau_x=np.array([[0.0,1.0],[1.0,0.0]])
-        self.tau_y=np.array([[0.0,-1j],[1j,0.0]])
-        self.tau_z=np.array([[1.0,0.0],[0.0,-1.0]])
+        #spin
+        self.s_0 = np.array([[1.0,0.0],[0.0,1.0]])
+        self.s_x = np.array([[0.0,1.0],[1.0,0.0]])
+        self.s_y = np.array([[0.0,-1j],[1j,0.0]])
+        self.s_z = np.array([[1.0,0.0],[0.0,-1.0]])
 
         self.reprMat = np.array([[self.alpha,0.0],[0.0,self.beta]])
 
-        self.VfX = np.kron(self.tau_x,self.sigma_x)
-        self.VfY = np.kron(self.tau_y,self.sigma_x)
-        self.VcX = np.kron(self.tau_x, np.kron(self.reprMat, self.sigma_x))
-        self.VcY = np.kron(self.tau_y, np.kron(self.reprMat, self.sigma_x))
+        self.VfX = np.kron(self.s_0, np.kron(self.tau_x, self.sigma_x))
+        self.VfY = np.kron(self.s_0, np.kron(self.tau_y, self.sigma_x))
+        self.VcX = np.kron(self.s_0, np.kron(self.tau_x, np.kron(self.reprMat, self.sigma_x)))
+        self.VcY = np.kron(self.s_0, np.kron(self.tau_y, np.kron(self.reprMat, self.sigma_x)))
 
 class State:                   
-    def __init__(self,dagger,elec_type,elec_valley,elec_orb):
+    def __init__(self, dagger, elec_type, elec_valley, elec_orb, elec_spin):
         self.dagger = dagger
         self.elec_valley = elec_valley + 1
-        self.elec_orb = elec_orb + 1
-        self.elec_type = elec_type
+        self.elec_orb    = elec_orb + 1
+        self.elec_spin   = elec_spin + 1
+        self.elec_type   = elec_type
 
 class onebody_op:
     def __init__(self,elec_type,coeff_matrix):
@@ -37,15 +47,17 @@ class onebody_op:
         self.coeff_matrix = coeff_matrix
         self.op_terms = []
         if self.elec_type == "f":
-            for ival in range(2):
-                for iorb in range(2):
-                    self.op_array.append(State(False,"f",ival,iorb))
-                    self.op_dagger_array.append(State(True,"f",ival,iorb))
+            for ispin in range(2):
+                for ival in range(2):
+                    for iorb in range(2):
+                        self.op_array.append(State(False,"f",ival,iorb,ispin))
+                        self.op_dagger_array.append(State(True,"f",ival,iorb,ispin))
         else:
-            for ival in range(2):
-                for iorb in range(4):
-                    self.op_array.append(State(False,"c",ival,iorb))
-                    self.op_dagger_array.append(State(True,"c",ival,iorb))
+            for ispin in range(2):
+                for ival in range(2):
+                    for iorb in range(4):
+                        self.op_array.append(State(False,"c",ival,iorb,ispin))
+                        self.op_dagger_array.append(State(True,"c",ival,iorb,ispin))
 
         
     def create_1bo(self):
@@ -70,8 +82,8 @@ class onebody_op:
                 suffix2="dg"
             else:
                 suffix2=""
-            print(str(coeff) +"  "+ op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+" "\
-            +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb))
+            print(str(coeff) +"  "+ op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
+                                  + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
 
 class twobody_op:
     def __init__(self,op_1,op_2,coeff):
@@ -113,6 +125,7 @@ class twobody_op:
             #is there the mean-field term?
             if (b.elec_valley == c.elec_valley) and\
             (b.elec_orb == c.elec_orb) and\
+            (b.elec_spin == c.elec_spin) and\
             (b.elec_type == c.elec_type):
                 dummylist.append([coeff,a,d])    
             
@@ -125,11 +138,13 @@ class twobody_op:
             if (b.dagger == False) and (d.dagger == False) and\
             (b.elec_valley == d.elec_valley) and\
             (b.elec_orb == d.elec_orb) and\
+            (b.elec_spin == d.elec_spin) and\
             (b.elec_type == d.elec_type):
                 pass
             elif (a.dagger == True) and (c.dagger == True) and\
             (a.elec_valley == c.elec_valley) and\
             (a.elec_orb == c.elec_orb) and\
+            (a.elec_spin == c.elec_spin) and\
             (a.elec_type == c.elec_type):
                 pass
             else:
@@ -196,10 +211,10 @@ class twobody_op:
                 else:
                     suffix4=""
                 print(str(coeff) +"  "\
-                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+" "\
-                +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+" "\
-                +op_3.elec_type+suffix3+"_"+str(op_3.elec_valley)+"_"+str(op_3.elec_orb)+" "\
-                +op_4.elec_type+suffix4+"_"+str(op_4.elec_valley)+"_"+str(op_4.elec_orb))
+                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
+                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin)+" "\
+                + op_3.elec_type+suffix3+"_"+str(op_3.elec_valley)+"_"+str(op_3.elec_orb)+"_"+str(op_3.elec_spin)+" "\
+                + op_4.elec_type+suffix4+"_"+str(op_4.elec_valley)+"_"+str(op_4.elec_orb)+"_"+str(op_4.elec_spin))
             except:
                 if op_1.dagger==True:
                     suffix1="dg"
@@ -210,8 +225,8 @@ class twobody_op:
                 else:
                     suffix2=""
                 print(str(coeff) +"  "\
-                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+" "\
-                +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb))
+                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
+                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
                 
     def prettyprint_decoupled(self):
         for iterm in range(len(self.mf_decoupled)):
@@ -232,13 +247,14 @@ class twobody_op:
             try:
                 dens_1=term[3]
                 dens_2=term[4]
-                densStr="dens_"+dens_1.elec_type+"_"+str(dens_1.elec_valley)+"_"+str(dens_1.elec_orb)+"_"+dens_2.elec_type+"_"+str(dens_2.elec_valley)+"_"+str(dens_2.elec_orb)
+                densStr="dens_"+dens_1.elec_type+"_"+str(dens_1.elec_valley)+"_"+str(dens_1.elec_orb)+"_"+str(dens_1.elec_spin)\
+                           +"_"+dens_2.elec_type+"_"+str(dens_2.elec_valley)+"_"+str(dens_2.elec_orb)+"_"+str(dens_2.elec_spin)
             except:
                 densStr=""
             print(str(coeff) +"  "\
             +densStr+"  "
-            +op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+" "\
-            +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb))
+            +op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
+            +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
 
     def print_to_dc_decoupled(self):
         self.operator_array_for_dc=[]
@@ -252,28 +268,35 @@ class twobody_op:
             op_1_type=term[1].elec_type
             op_1_valley=term[1].elec_valley -1
             op_1_orb=term[1].elec_orb -1
+            op_1_spin=term[1].elec_spin -1
             
             op_2_type=term[2].elec_type
             op_2_valley=term[2].elec_valley -1
             op_2_orb=term[2].elec_orb -1
+            op_2_spin=term[2].elec_spin -1
+            
             try:
                 dens_1_type=term[3].elec_type
                 dens_1_valley=term[3].elec_valley -1
                 dens_1_orb=term[3].elec_orb -1
+                dens_1_spin=term[3].elec_spin -1
                 
                 dens_2_type=term[4].elec_type
                 dens_2_valley=term[4].elec_valley -1
                 dens_2_orb=term[4].elec_orb -1
+                dens_2_spin=term[4].elec_spin -1
                 
                 self.coeff_for_dc.append(coeff)
-                self.operator_array_for_dc.append([op_1_orb,op_1_valley,op_1_type,op_2_orb,op_2_valley,op_2_type])
-                self.density_array_for_dc.append([dens_1_orb,dens_1_valley,dens_1_type,dens_2_orb,dens_2_valley,dens_2_type])
+                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
+                self.density_array_for_dc.append([dens_1_orb, dens_1_valley, dens_1_spin, dens_1_type, dens_2_orb, dens_2_valley, dens_2_spin, dens_2_type])
             except:
                 self.coeff_for_dc.append(coeff)
-                self.operator_array_for_dc.append([op_1_orb,op_1_valley,op_1_type,op_2_orb,op_2_valley,op_2_type])
+                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
                 self.density_array_for_dc.append(["NODENS"])
         
-        return self.coeff_for_dc,self.operator_array_for_dc,self.density_array_for_dc
+        
+        
+        return self.coeff_for_dc, self.operator_array_for_dc, self.density_array_for_dc
 
 
 

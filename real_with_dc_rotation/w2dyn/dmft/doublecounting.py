@@ -556,10 +556,12 @@ class Wterm(SelfConsistent):
             dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
             for iterm in range(len(dc_coeff_array)):
                 if dc_dens_array[iterm][0]=="NODENS":
-                    for ispin in range(2):
-                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                    ispin  = dc_op_array[iterm][2]
+                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                    jspin  = dc_op_array[iterm][6]
+                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
                     
         # f+c terms, x and y
         for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
@@ -574,17 +576,23 @@ class Wterm(SelfConsistent):
             dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
             for iterm in range(len(dc_coeff_array)):
                 if dc_dens_array[iterm][0]=="NODENS":
-                    for ispin in range(2):
-                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                    ispin  = dc_op_array[iterm][2]
+                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                    jspin  = dc_op_array[iterm][6]
+                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
                 else:
-                    for ispin in range(2):
-                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
-                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
-                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                    ispin  = dc_op_array[iterm][2]
+                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                    jspin  = dc_op_array[iterm][6]
+                    
+                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+                    dens_ispin  = dc_dens_array[iterm][2]
+                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+                    dens_jspin  = dc_dens_array[iterm][6]
+                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
                         
         # c+c terms, x and y
         for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
@@ -599,17 +607,23 @@ class Wterm(SelfConsistent):
             dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
             for iterm in range(len(dc_coeff_array)):
                 if dc_dens_array[iterm][0]=="NODENS":
-                    for ispin in range(2):
-                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm]
+                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                    ispin  = dc_op_array[iterm][2]
+                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                    jspin  = dc_op_array[iterm][6]
+                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
                 else:
-                    for ispin in range(2):
-                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][2])
-                        jindex = self.orbvalley_index(dc_op_array[iterm][3],dc_op_array[iterm][4],dc_op_array[iterm][5])
-                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][2])
-                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][3],dc_dens_array[iterm][4],dc_dens_array[iterm][5])
-                        tmp_dc_full[iindex,ispin,jindex,ispin] += dc_coeff_array[iterm] * densities[dens_iindex,ispin,dens_jindex,ispin]
+                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                    ispin  = dc_op_array[iterm][2]
+                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                    jspin  = dc_op_array[iterm][6]
+                    
+                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+                    dens_ispin  = dc_op_array[iterm][2]
+                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+                    dens_jspin  = dc_op_array[iterm][6]
+                    
+                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
         
         
         ######################

@@ -40,11 +40,12 @@ for iband in range(4):
             for lband in range(4):
                 orbvector=[iband+1,jband+1,kband+1,lband+1]
                 for itest in range(np.shape(list_of_indices)[0]):
-                    
                     if np.array_equal(orbvector,list_of_indices[itest]):
-                        interactionmatrix[iband,0,jband,0,kband,0,lband,0] = -1*lbd*alpha22*(x_coeffs[itest]+(y_coeffs[itest]))
-                        interactionmatrix[iband,1,jband,1,kband,1,lband,1] = -1*lbd*alpha22*(x_coeffs[itest]+(y_coeffs[itest]))
-                        break
+                        for ispin in range(2):
+                            for jspin in range(2):
+                                interactionmatrix[iband,ispin,jband,jspin,kband,ispin,lband,jspin] = -1*lbd*alpha22*(x_coeffs[itest]+(y_coeffs[itest]))
+                                break
+                
 
 kanamori_umatrix = np.genfromtxt("u_matrix_template.dat",dtype='str')
 np.shape(kanamori_umatrix)
