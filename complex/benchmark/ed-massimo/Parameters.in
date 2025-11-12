@@ -1,0 +1,27 @@
+# Call with cthyb
+[General]
+DOS = EDcheck
+half-bandwidth = 1, 2
+beta = 100.
+mu = 1.75
+NAt = 1
+DMFTsteps = 0
+StatisticSteps = 1
+FileNamePrefix = 2Band_massimo
+magnetism = para
+[Atoms]
+[[1]]
+Nd = 2
+Hamiltonian = Kanamori
+Udd = 2.0
+Jdd = 0.5
+Vdd = 1.0
+QuantumNumbers = Nt Szt Qzt
+[QMC]
+Nwarmups = 500000
+Nmeas = 500000
+NCorr = 5000
+truncation = 5
+Ntau = 500
+Niw = 2000
+Eigenbasis=1

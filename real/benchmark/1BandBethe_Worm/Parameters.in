@@ -1,0 +1,46 @@
+[General]
+DOS                   = Bethe
+NAt                   = 1
+beta                  = 100
+mu                    = 0.5
+DMFTsteps             = 0
+StatisticSteps        = 0
+WormSteps             = 1
+magnetism             = para
+EPSN                  = 0.0
+FileNamePrefix        = bethe
+
+#FTType                = none_worm 
+#SelfEnergy            = improved_worm
+
+[Atoms]
+[[1]]
+Nd                    = 1
+Hamiltonian           = Density
+Udd                   = 1.0
+QuantumNumbers        = Nt Szt Azt
+
+[QMC]
+Nwarmups              = 1e6
+Nmeas                 = 1
+NCorr                 = 1e5
+truncation            = 2
+Ntau                  = 500
+Niw                   = 800
+NLegMax               = 30
+NLegOrder             = 30
+Eigenbasis            = 1
+
+PercentageWormInsert  = 0.3
+PercentageWormReplace = 0.1
+WormEta               = 1
+WormSearchEta         = 0
+
+WormMeasGtau          = 1
+WormComponents        = 1, 4
+
+#WormMeasG4iw          = 1
+#FourPnt               = 8
+#N4iwf                 = 60
+#N4iwb                 = 60
+#WormPHConvention      = 1

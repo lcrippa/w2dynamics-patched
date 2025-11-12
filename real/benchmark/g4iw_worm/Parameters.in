@@ -1,0 +1,43 @@
+[General]
+DOS=ReadIn
+HkFile=../dmft_worm/hubbard_2d_48_48_1.hk
+beta=5
+NAt=1
+EPSN=0
+mu=0.
+DMFTsteps = 0
+StatisticSteps=0
+WormSteps = 1
+FileNamePrefix=square_vertex_n1_U0_b5
+magnetism=para
+siw_moments=estimate
+FTType=none
+
+
+[Atoms]
+[[1]]
+Hamiltonian=Density
+Udd=0.0
+Nd=1
+
+
+[QMC]
+Nwarmups = 1e4#1e6
+Nmeas = 1e6# 4e7
+NCorr = 30
+Ntau = 1000
+Niw = 2000
+Eigenbasis = 1
+WormMeasG4iw=1
+nfft_mode_g4iw = 0
+G4ph = 1  # do Fourier transform in ph notation
+G4pp = 1  # do Fourier transform in pp notation
+WormPHConvention = 1  # use ADGA convention
+FourPnt = 8  # compute four-point function (i.e. two-particle GF) in worm sampling
+PercentageWormInsert = 0.3
+PercentageWormReplace = 0.1
+WormComponents = 1, 
+N4iwf = 30
+N4iwb = 10
+WormEta = 1
+WormSearchEta = 1

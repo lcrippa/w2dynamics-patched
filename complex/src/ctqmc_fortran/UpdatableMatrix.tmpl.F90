@@ -1,0 +1,1548 @@
+#if 0
+! This is a templated Fortran file.
+!
+! By invoking `make`, several modules are generated in sub-directories
+! double/ etc, for each valid value type (real, complex, etc.).
+! In each generated module, the value VALUE_TYPE is replaced by the
+! corresponding value type, and each uppercase derived type is replaced by
+! a typed version.
+#endif
+
+module MUPDATABLE_MATRIX
+    use iso_c_binding, only: c_double, c_double_complex, c_int64_t
+    use MBLAS
+    use MBufferD
+    use MBufferI
+    use MBufferZ
+    use MComplexNumbers, only: nan
+    use MEXT_RANGE
+    use MLAPACK
+    use MPermutation
+    use MPrinting
+    use MQR_DECOMPOSITION
+    use MSortingI
+    use Testing
+    implicit none
+    private
+
+    !> Updatable square matrix together with inverse and determinant
+    !!
+    !! Stores a square matrix together with its inverse and its determinant in
+    !! such a way as to facilitate low-rank updates as well as
+    !! row/column addition and removal without frequent reallocations.
+    !!
+    !! Use `getmatrix`, `get_det` and `getinv` to get the matrix, its
+    !! determinant, and its inverse, respectively.
+    !!
+    !! Alterations can be made using updates, which come in two stages: the
+    !! are proposed by the `propose_*` functions, which propose an update to
+    !! the matrix, but do not change it.  After proposal, the determinant of
+    !! the proposed update is available using `get_det`.  The proposal can
+    !! be accepted using `accept_update()`.
+    type, public :: UPDATABLE_MATRIX
+        private
+        integer :: size = 0
+        type(EXT_RANGE) :: det
+        VALUE_TYPE :: det_q
+        VALUE_TYPE, allocatable :: matbuf(:, :)
+        VALUE_TYPE, allocatable :: qbuf(:, :), rbuf(:, :)
+
+        !> Column permutation: let `A = QR`. Then `A(:,i) == QR(:,jperm(i))`
+        integer, allocatable :: jperm(:)
+    end type
+
+    !> Base type for the update
+    !!
+    !! Use propose_* routines to propose actual updates. You can erase the
+    !! concrete update type by setting a pointer of type(MATRIX_UPDATE_BASE)
+    !! and then use get_det() and accept_update().
+    type, abstract, public :: MATRIX_UPDATE_BASE
+        private
+        type(UPDATABLE_MATRIX), pointer :: target
+        type(EXT_RANGE) :: det
+    contains
+        private
+        procedure(base_accept_update), deferred :: accept_update
+    end type
+
+    abstract interface
+        subroutine base_accept_update(self)
+            import :: MATRIX_UPDATE_BASE
+            class(MATRIX_UPDATE_BASE), intent(inout) :: self
+        end
+    end interface
+
+    !> Update to replace the matrix by another.
+    !!
+    !! Update which replaces the matrix by another matrix, not necessarily of
+    !! the same size as the current one.  Use `propose_replace_matrix()` to
+    !! propose this update.
+    type, extends(MATRIX_UPDATE_BASE), public :: MATRIX_REPLACE
+        integer :: size = 0
+        VALUE_TYPE :: det_q
+        VALUE_TYPE, allocatable :: matbuf(:, :)
+        VALUE_TYPE, allocatable :: qrbuf(:, :), taubuf(:), work(:)
+        REAL_TYPE, allocatable :: rwork(:)
+        integer, allocatable :: jswaps(:)
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_repl_accept
+    end type
+
+    !> Update to grow the matrix.
+    !!
+    !! Update which inserts a set of rows and columns at arbitrary position in
+    !! the matrix.  Use `propose_grow_matrix()` to propose this update.
+    type, extends(MATRIX_UPDATE_BASE), public :: MATRIX_GROW
+        private
+        integer :: newsize, rank
+        VALUE_TYPE :: det_q
+        VALUE_TYPE, allocatable :: rows(:, :), cols(:, :), dot(:, :)
+        VALUE_TYPE, allocatable :: rbuf(:, :), qbuf(:, :)
+        type(PLANE_ROTATION), allocatable :: giv(:, :)
+        integer, allocatable :: iperm(:), jperm(:), jgrowperm(:)
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_grow_accept
+    end type
+
+    !> Update to shrink the matrix.
+    !!
+    !! Update which removes a set of rows and columns at arbitrary position
+    !! from the matrix.  Use `propose_shrink_matrix()` to propose this update.
+    type, extends(MATRIX_UPDATE_BASE), public :: MATRIX_SHRINK
+        private
+        integer :: newsize, rank
+        VALUE_TYPE :: det_q
+        integer, allocatable :: irem(:), jrem(:), jperm(:)
+        VALUE_TYPE, allocatable :: qrows(:, :), q(:, :), r(:, :)
+        type(PLANE_ROTATION), allocatable :: giv_q(:, :), giv_r(:, :)
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_shrink_accept
+    end type
+
+    !> Low-rank update to the matrix.
+    !!
+    !! Update the matrix by a low-rank matrix.  Use
+    !! `propose_low_rank_update()` to propose this update.
+    type, extends(MATRIX_UPDATE_BASE), public :: LOW_RANK_UPDATE
+        private
+        type(MATRIX_REPLACE) :: naive
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_update_accept
+    end type
+
+    !> Replace set of rows.
+    !!
+    !! Replace a set of rows by another set, potentially at a different
+    !! position in the matrix.  Use `propose_replace_rows()` to propose this
+    !! update.
+    type, extends(MATRIX_UPDATE_BASE), public :: REPLACE_ROWS
+        private
+        type(MATRIX_REPLACE) :: naive
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_rows_accept
+    end type
+
+    !> Replace set of columns.
+    !!
+    !! Replace a set of columns by another set, potentially at a different
+    !! position in the matrix.  Use `propose_replace_cols()` to propose this
+    !! update.
+    type, extends(MATRIX_UPDATE_BASE), public :: REPLACE_COLS
+        private
+        type(MATRIX_REPLACE) :: naive
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_cols_accept
+    end type
+
+    !> Scale and permute rows and columns.
+    !!
+    !! Scale the rows and columns by a set of vectors, then permute rows and
+    !! columns, i.e., multiply the matrix from left and right by generalized
+    !! permutation matrices.  Use `propose_permute_matrix()` to propose this
+    !! update.
+    type, extends(MATRIX_UPDATE_BASE), public :: MATRIX_PERMUTE
+        private
+        integer :: size
+        VALUE_TYPE :: det_q
+        integer, allocatable :: iperm(:), jperm(:)
+        logical, allocatable :: pwork(:)
+        VALUE_TYPE, allocatable :: iscale(:), jscale(:), buffer(:,:)
+    contains
+        private
+        procedure, non_overridable :: accept_update => p_permute_accept
+    end type
+
+    interface size
+        module procedure p_size
+    end interface
+
+    interface get_det
+        module procedure p_det, p_base_det
+    end interface
+
+    interface getinv
+        module procedure p_inv
+    end interface
+
+    interface copyinv
+        module procedure p_copyinv
+    end interface
+
+    interface getmatrix
+        module procedure p_getmatrix
+    end interface
+
+    interface copymatrix
+        module procedure p_copymatrix
+    end interface
+
+    interface setmatrix
+        module procedure p_setmatrix
+    end interface
+
+    interface propose_replace_matrix
+        module procedure p_repl_propose
+    end interface
+
+    interface propose_grow_matrix
+        module procedure p_grow_propose, p_grow_propose_naive
+    end interface
+
+    interface propose_shrink_matrix
+        module procedure p_shrink_propose, p_shrink_propose_naive
+    end interface
+
+    interface propose_low_rank_update
+        module procedure p_update_propose, p_update_propose_naive
+    end interface
+
+    interface propose_replace_rows
+        module procedure p_rows_propose, p_rows_propose_naive
+    end interface
+
+    interface propose_replace_cols
+        module procedure p_cols_propose, p_cols_propose_naive
+    end interface
+
+    interface propose_permute_matrix
+        module procedure p_permute_propose
+    end interface
+
+    interface accept_update
+        module procedure p_accept_update
+    end interface
+
+    interface verify
+        module procedure p_verify
+    end interface
+
+    interface min_condition_number
+       module procedure p_min_cond
+    end interface
+
+    interface setsize
+        module procedure p_setsize, p_repl_setsize, p_permute_setsize
+    end interface
+
+    interface permutematrix
+        module procedure p_permutematrix
+    end interface
+
+    interface identity
+        module procedure p_identity
+    end interface
+
+    ! Helper for conjugation of a real number (no-op)
+#ifndef VALUE_IS_COMPLEX
+    interface conjg
+        module procedure conjg_real
+    end interface
+#endif
+
+    public :: min_condition_number
+    public :: size, get_det, getinv, copyinv, getmatrix, copymatrix, setmatrix
+    public :: propose_replace_matrix, propose_grow_matrix, propose_shrink_matrix
+    public :: propose_low_rank_update, propose_replace_rows, propose_replace_cols
+    public :: propose_permute_matrix
+    public :: accept_update, verify
+    public :: permutematrix, identity
+
+    VALUE_TYPE, parameter :: ZERO = 0.0
+    VALUE_TYPE, parameter :: ONE = 1.0
+
+contains
+    pure logical function p_isinit(self) result(test)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+
+        test = allocated(self%matbuf)
+    end
+
+    subroutine p_init(self)
+        type(UPDATABLE_MATRIX), intent(inout) :: self
+
+        if (p_isinit(self)) &
+            return
+        self%size = 0
+        self%det = ONE
+        self%det_q = ONE
+        call p_setsize(self, 0, .false.)
+    end
+
+    pure function p_size(self) result(r)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        integer :: r
+        r = self%size
+    end
+
+    pure function p_det(self) result(r)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        type(EXT_RANGE) :: r
+        r = self%det
+    end
+
+    function p_inv(self) result(r)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        VALUE_TYPE, allocatable :: r(:, :)
+
+        allocate(r(self%size, self%size))
+        call copyinv(self, r)
+    end
+
+    subroutine p_copyinv(self, buf)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        VALUE_TYPE, intent(out) :: buf(:, :)
+        VALUE_TYPE :: cbuf(self%size, self%size)
+        integer :: info, n
+
+        n = self%size
+        if (size(buf,1) /= n .or. size(buf,2) /= n) &
+            stop 'size mismatch'
+
+        if (n == 0) return
+
+        ! A * P = Q * R implies that R * P' * inv(A) = Q'
+        call copy_adjoint(self%qbuf(:n, :n), cbuf)
+        call TRTRS('U', 'N', 'N', n, n, &
+                   self%rbuf(1, 1), size(self%rbuf, 1), &
+                   cbuf(1, 1), size(cbuf, 1), info)
+        call check_info(info)
+
+        ! inv(A) = P * B
+        buf(:, :) = cbuf(self%jperm(:n), :)
+    end
+
+    pure subroutine copy_adjoint(a, aadj)
+        VALUE_TYPE, intent(in) :: a(:, :)
+        VALUE_TYPE, intent(out) :: aadj(size(a, 2), size(a, 1))
+        integer :: i, j
+
+        do j = 1, size(aadj, 2)
+            do i = 1, size(aadj, 1)
+                aadj(i, j) = conjg(a(j, i))
+            enddo
+        enddo
+    end
+
+    function p_getmatrix(self) result(r)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        VALUE_TYPE, allocatable :: r(:, :)
+
+        allocate(r(self%size, self%size))
+        call copymatrix(self, r)
+    end
+
+    subroutine p_copymatrix(self, buf)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        VALUE_TYPE, intent(out) :: buf(:, :)
+
+        if (size(buf,1) /= self%size .or. size(buf,2) /= self%size) &
+            stop 'size mismatch'
+
+        buf(:, :) = self%matbuf(:self%size, :self%size)
+    end
+
+    subroutine p_setmatrix(self, a)
+        type(UPDATABLE_MATRIX), intent(inout) :: self
+        VALUE_TYPE, intent(in) :: a(:, :)
+
+        type(MATRIX_REPLACE) :: replmove
+
+        call p_init(self)
+        call propose_replace_matrix(replmove, self, a)
+        call accept_update(replmove)
+    end
+
+    subroutine p_verify(self, rtol)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        REAL_TYPE, intent(in), optional :: rtol
+
+        type(EXT_RANGE) :: det
+        VALUE_TYPE, allocatable :: work(:,:)
+        VALUE_TYPE :: det_q
+        REAL_TYPE :: cond
+        REAL_TYPE, parameter :: ONE_REAL = 1
+        integer :: n
+
+        call assert_equal(allocated(self%qbuf), allocated(self%matbuf))
+        call assert_equal(allocated(self%rbuf), allocated(self%matbuf))
+        call assert_equal(allocated(self%jperm), allocated(self%matbuf))
+
+        if (.not. p_isinit(self)) then
+            call assert_equal(self%size, 0)
+            return
+        endif
+
+        n = self%size
+
+        ! This is anyway a debugging operation, so we do not have to
+        ! optimize for allocations
+        allocate(work, source=self%matbuf(:n, :n))
+
+        ! Recompute determinant
+        det = p_determinant(self%matbuf(:n, :n))
+        call assert_close(self%det, det, rtol=rtol)
+
+        ! Check that determinant of Q has magnitude 1 and matches stored one
+        det_q = limrange(p_determinant(self%qbuf(:n, :n)))
+        call assert_close(abs(det_q), 1.0d0, rtol=rtol)
+        call assert_close(self%det_q, det_q, rtol=rtol)
+
+        ! Check if Q is orthogonal
+        if (n /= 0) then
+            call GEMM('C', 'N', self%size, self%size, self%size, ONE, &
+                    self%qbuf(1, 1), size(self%qbuf, 1), &
+                    self%qbuf(1, 1), size(self%qbuf, 1), &
+                    ZERO, work(1, 1), size(work, 1))
+            call p_check_unit_matrix(work(:n, :n), tol=rtol)
+        endif
+
+        ! Check if R is upper triangular
+        call p_check_upper_triangular(self%rbuf(:n, :n), rtol=rtol)
+
+        ! Reconstruct A from Q R
+        call p_reconstruct_matrix(self, work)
+        call assert_close(work, self%matbuf(:n, :n), rtol=rtol)
+
+        ! XXX conditioning is an issue we will have to deal with at some point
+        cond = min_condition_number(self)
+        if (cond > sqrt(1 / epsilon(ONE_REAL))) then
+            write (0,*) 'Warning: matrix poorly conditioned, cond =', cond
+        endif
+    end
+
+    subroutine p_reconstruct_matrix(self, buf)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        VALUE_TYPE, intent(out) :: buf(:, :)
+
+        if (size(buf,1) /= self%size .or. size(buf,2) /= self%size) &
+            stop 'size mismatch'
+
+        if (self%size == 0) return
+
+        ! XXX requires buf to be contiguous
+        call GEMM('N', 'N', self%size, self%size, self%size, ONE, &
+                self%qbuf(1, 1), size(self%qbuf, 1), &
+                self%rbuf(1, 1), size(self%rbuf, 1), &
+                ZERO, buf(1, 1), size(buf, 1))
+
+        ! XXX avoid temporary
+        buf(:, :) = buf(:, self%jperm(:self%size))
+    end
+
+    function p_determinant(a) result(det)
+        VALUE_TYPE, intent(in) :: a(:, :)
+        type(EXT_RANGE) :: det
+
+        VALUE_TYPE :: work(size(a, 1), size(a, 2))
+        integer :: n, info, ipiv(size(a, 1)), jpiv(size(a, 2))
+
+        n = size(a, 1)
+        if (size(a, 2) /= n) &
+            error stop 'Matrix must be square'
+
+        if (n == 0) &
+            return
+
+        work(:, :) = a(:, :)
+        call GETC2(n, work(1, 1), size(work, 1), ipiv(1), jpiv(1), info)
+        if (n < 0) &
+            error stop 'Invalid call to GETC2'
+
+        det = product_of_diagonal(work(:n, :n))
+        if (swap_parity(ipiv)) &
+            det = -det
+        if (swap_parity(jpiv)) &
+            det = -det
+    end
+
+    subroutine p_check_unit_matrix(a, tol)
+        VALUE_TYPE, intent(in) :: a(:, :)
+        REAL_TYPE, intent(in), optional :: tol
+
+        REAL_TYPE :: thr, val
+        integer :: i, j
+
+        thr = 2 * sqrt(dble(size(a))) * default(tol, epsilon(tol))
+        do j = 1, size(a, 2)
+            do i = 1, size(a, 1)
+                if (i == j) then
+                    val = 1
+                else
+                    val = 0
+                endif
+                if (abs(a(i, j) - val) <= thr) &
+                    cycle
+
+                call print_array(a, name='I')
+                error stop 'I is not the unit matrix'
+            enddo
+        enddo
+    end
+
+    subroutine p_check_upper_triangular(a, rtol)
+        VALUE_TYPE, intent(in) :: a(:, :)
+        REAL_TYPE, intent(in), optional :: rtol
+
+        if (.not. is_upper_triangular(a, rtol)) then
+            call print_array(a, name='R')
+            error stop 'R is not upper triangular'
+        endif
+    end
+
+    subroutine p_setsize(self, newsize, preserve)
+        type(UPDATABLE_MATRIX), intent(inout) :: self
+        integer, intent(in) :: newsize
+        logical, intent(in) :: preserve
+        integer :: cap
+
+        cap = max(newsize, 1)
+        call reserve(self%matbuf, cap, cap, preserve)
+        call reserve(self%qbuf, cap, cap, preserve)
+        call reserve(self%rbuf, cap, cap, preserve)
+        call reserve(self%jperm, cap, preserve)
+        self%size = newsize
+    end
+
+    function p_min_cond(self) result(cond)
+        type(UPDATABLE_MATRIX), intent(in) :: self
+        REAL_TYPE :: cond
+
+        if (self%size <= 1) then
+            cond = 1
+            return
+        endif
+
+        cond = abs(self%rbuf(1, 1) / self%rbuf(self%size, self%size))
+    end function
+
+    ! =========================================================================
+    ! BASE MOVE
+
+    pure function p_base_det(self) result(r)
+        class(MATRIX_UPDATE_BASE), intent(in) :: self
+        type(EXT_RANGE) :: r
+
+        r = self%det
+    end
+
+    subroutine p_accept_update(self)
+        class(MATRIX_UPDATE_BASE), intent(inout) :: self
+
+        call self%accept_update()
+    end
+
+    ! ========================== replacement move ============================
+
+    pure logical function p_repl_isinit(self) result(test)
+        type(MATRIX_REPLACE), intent(in) :: self
+
+        test = allocated(self%matbuf)
+    end
+
+    subroutine p_repl_init(self)
+        type(MATRIX_REPLACE), intent(inout) :: self
+
+        if (p_repl_isinit(self)) return
+        self%target => null()
+        self%det = ZERO
+        call setsize(self, 0)
+    end
+
+    subroutine p_repl_propose(self, t, a)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        VALUE_TYPE, intent(in) :: a(:, :)
+
+        integer :: n
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(a, 1)
+        if (n /= size(a, 2)) &
+            stop 'Replacement matrix must be square'
+
+        call setsize(self, n)
+        self%matbuf(:n, :n) = a
+
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_repl_prepare(self)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        integer :: n, info
+
+        n = self%size
+        self%qrbuf(:n, :n) = self%matbuf(:n, :n)
+
+        ! Indicates that the column is free to be swapped in pivoting
+        self%jswaps(:n) = 0
+        call GEQP3X( &
+                n, n, self%qrbuf(1,1), size(self%qrbuf, 1), self%jswaps(1), &
+                self%taubuf(1), self%work(1), size(self%work), self%rwork(1), &
+                info)
+        call check_info(info)
+
+        self%det_q = householder_det(self%taubuf(:n))
+
+        self%det = product_of_diagonal(self%qrbuf(:n, :n))
+        self%det = self%det * self%det_q
+        if (perm_parity(self%jswaps(:n))) &
+            self%det = -self%det
+    end
+
+    subroutine p_repl_accept(self)
+        class(MATRIX_REPLACE), intent(inout) :: self
+        integer :: i, j, n, info
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        n = self%size
+        call setsize(self%target, n, .false.)
+
+        ! Put Q into the Q buffer of the target
+        do j = 1, n-1
+            do i = j+1, n
+                self%target%qbuf(i, j) = self%qrbuf(i, j)
+            enddo
+        enddo
+        call UNGQR(n, n, n, self%target%qbuf(1,1), size(self%target%qbuf, 1), &
+                   self%taubuf(1), self%work(1), size(self%work), info)
+        call check_info(info)
+
+        ! Put R into the target's R buffer
+        do j = 1, n
+            do i = 1, j
+                self%target%rbuf(i, j) = self%qrbuf(i, j)
+            enddo
+            do i = j+1, n
+                self%target%rbuf(i, j) = ZERO
+            enddo
+        enddo
+
+        ! Set P to the identity permutation
+        self%target%jperm(:n) = get_inv_perm(self%jswaps(:n))
+
+        ! Update matrix
+        ! TODO exchange buffers if possible
+        self%target%matbuf(:n, :n) = self%matbuf(:n, :n)
+
+        self%target%det = self%det
+        self%target%det_q = self%det_q
+        self%target => null()
+    end
+
+    subroutine p_repl_setsize(self, newsize)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        integer, intent(in) :: newsize
+        integer :: cap
+
+        cap = max(newsize, 1)
+        call reserve(self%matbuf, cap, cap)
+        call reserve(self%qrbuf, cap, cap)
+        call reserve(self%taubuf, cap)
+        call reserve(self%work, max(cap * cap, 3 * cap + 1))
+        call reserve(self%rwork, 2 * cap)
+        call reserve(self%jswaps, cap)
+        self%size = newsize
+    end
+
+    ! ======================== growing functions ==============================
+
+    subroutine p_grow_setsize(self, newsize, rank)
+        type(MATRIX_GROW), intent(inout) :: self
+        integer, intent(in) :: newsize, rank
+        integer :: cap
+
+        cap = max(newsize, 1)
+        call reserve(self%rbuf, newsize, newsize)
+        call reserve(self%qbuf, newsize, newsize)
+        call reserve_plane_rot(self%giv, rank, newsize)
+        call reserve(self%cols, newsize, rank)
+        call reserve(self%rows, rank, newsize)
+        call reserve(self%dot, rank, rank)
+        call reserve(self%iperm, newsize)
+        call reserve(self%jperm, newsize)
+        call reserve(self%jgrowperm, newsize)
+        self%newsize = newsize
+        self%rank = rank
+    end
+
+    subroutine p_grow_propose_naive(self, t, inew, jnew, rows, cols, dot)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: inew(:), jnew(:)
+        VALUE_TYPE, intent(in) :: rows(:, :), cols(:, :), dot(:, :)
+
+        integer :: n, k
+        integer :: iperm(size(cols,1) + size(cols,2)), jperm(size(iperm))
+        VALUE_TYPE :: matbuf(size(iperm), size(iperm))
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(cols, 1)
+        k = size(cols, 2)
+        if (n /= t%size) &
+            stop 'Update does not match matrix'
+        if (n /= size(rows, 2) .or. k /= size(rows, 1)) &
+            stop 'Invalid size of rows'
+        if (k /= size(dot, 1) .or. k /= size(dot, 2)) &
+            stop 'Invalid size of dot'
+        if (k /= size(inew) .or. k /= size(jnew)) &
+            stop 'Invalid size of inew, jnew'
+
+        call setsize(self, n + k)
+        matbuf(:n, :n) = t%matbuf(:n, :n)
+        matbuf(:n, n+1:n+k) = cols
+        matbuf(n+1:n+k, :n) = rows
+        matbuf(n+1:n+k, n+1:n+k) = dot
+
+        call grow_perm(n, inew, iperm)
+        call grow_perm(n, jnew, jperm)
+
+        call p_permutematrix(matbuf, iperm, jperm, self%matbuf(:n+k, :n+k))
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_grow_propose(self, t, inew, jnew, rows, cols, dot)
+        type(MATRIX_GROW), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: inew(:), jnew(:)
+        VALUE_TYPE, intent(in) :: rows(:, :), cols(:, :), dot(:, :)
+
+        VALUE_TYPE :: colsp(size(cols, 1), size(cols, 2))
+        integer :: j, n, k
+
+        call p_init(t)
+        self%target => t
+
+        n = size(cols, 1)
+        k = size(cols, 2)
+        call p_grow_setsize(self, n + k, k)
+
+        ! XXX Allow move(...) of these structures ...
+        self%cols(:n, :k) = cols
+        self%rows(:k, :n) = rows
+        self%dot(:k, :k) = dot
+
+        ! Let us assume that we have a QR decomposition to which we are adding
+        ! the a row A at the top, columns C in the back, and an matrix D in
+        ! the upper right corner.  Then we can start with:
+        !
+        !         [ 1             ]  [ A A ... A A D ]
+        !         [   Q Q ... Q Q ]  [ r R ... R R Z ]
+        !         [   Q Q ... Q Q ]  [   r ... R R Z ]
+        !         [   ... ... ... ]  [     ...   ... ]
+        !         [   Q Q ... Q Q ]  [         r R Z ]
+        !         [   Q Q ... Q Q ]  [           r Z ]
+        !
+        ! where C = Q Z. The upper triangular matrix becomes upper Hessenberg,
+        ! and we can use a sequence of Givens rotations to zero the subdiagonal
+        ! (lower-case r)
+        self%rbuf(1:k, n+1:n+k) = dot(:, :)
+        if (n /= 0) then
+            self%rbuf(1:k, t%jperm(:n)) = rows(:, :)
+            self%rbuf(k+1:n+k, 1:n) = t%rbuf(:n, :n)
+            call GEMM('C', 'N', n, k, n, &
+                      ONE, t%qbuf(1, 1), size(t%qbuf, 1), &
+                      self%cols(1, 1), size(self%cols, 1), &
+                      ZERO, colsp(1, 1), size(colsp, 1))
+            self%rbuf(k+1:k+n, n+1:n+k) = colsp
+        endif
+
+        call qr_hessenberg(k, self%rbuf(:n+k, :n+k), size(self%rbuf, 1), &
+                           self%giv(1:k, 1:n+k-1))
+
+        self%det = product_of_diagonal(self%rbuf(:n+k, :n+k))
+
+        ! Use permutations
+        call grow_perm_front(n, inew, self%iperm(:n+k))
+
+        self%det_q = t%det_q
+        if (perm_parity(self%iperm(:n+k))) then
+            self%det_q = -self%det_q
+        endif
+        self%det = self%det * self%det_q
+
+        call grow_perm(n, jnew, self%jgrowperm(:n+k))
+        do j = 1, n+k
+            if (self%jgrowperm(j) > n) then
+                self%jperm(j) = self%jgrowperm(j)
+            else
+                self%jperm(j) = t%jperm(self%jgrowperm(j))
+            endif
+        enddo
+        if (perm_parity(self%jperm(:n+k))) &
+            self%det = -self%det
+    end
+
+    subroutine p_grow_accept(self)
+        class(MATRIX_GROW), intent(inout) :: self
+        integer :: n, k
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        n = self%target%size
+        k = self%rank
+        call setsize(self%target, n + k, .true.)
+
+        ! Construct Q matrix
+        !         [ 1             ]
+        !         [   Q Q ... Q Q ]
+        !         [   Q Q ... Q Q ]
+        !         [   ... ... ... ]
+        !         [   Q Q ... Q Q ]
+        !         [   Q Q ... Q Q ]
+        call identity(self%qbuf(:k, :k))
+        self%qbuf(k+1:k+n, 1:k) = ZERO
+        self%qbuf(1:k, k+1:k+n) = ZERO
+        self%qbuf(k+1:k+n, k+1:k+n) = self%target%qbuf(1:n, 1:n)
+
+        call rotate_q(self%qbuf(:n+k, :n+k), size(self%qbuf, 1), &
+                      self%giv(:k, :n+k-1))
+
+        self%target%qbuf(:n+k, :n+k) = self%qbuf(self%iperm(:n+k), :n+k)
+
+        ! XXX maybe simply exchange buffers?
+        self%target%rbuf(:n+k, :n+k) = self%rbuf(:n+k, :n+k)
+        self%target%jperm(:n+k) = self%jperm(:n+k)
+
+        self%target%det = self%det
+        self%target%det_q = self%det_q
+        self%target%size = self%newsize
+
+        ! Reuse Q buffer for full matrix
+        self%qbuf(1:k, 1:n) = self%rows(:k, :n)
+        self%qbuf(1:k, n+1:n+k) = self%dot(:k, :k)
+        self%qbuf(k+1:k+n, 1:n) = self%target%matbuf(:n, :n)
+        self%qbuf(k+1:k+n, n+1:n+k) = self%cols(:n, :k)
+        call p_permutematrix( &
+                self%qbuf(:n+k, :n+k), self%iperm(:n+k), self%jgrowperm(:n+k), &
+                self%target%matbuf(:n+k, :n+k))
+    end
+
+    ! ======================== shrinking functions ============================
+
+    subroutine p_shrink_propose_naive(self, t, irem, jrem)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: irem(1:), jrem(1:)
+
+        integer :: n, k
+        integer :: iperm(t%size), jperm(size(iperm))
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        k = size(irem)
+        n = self%target%size
+        if (k /= size(jrem)) &
+            stop 'Invalid size of inew, jnew'
+
+        ! Permutation
+        call shrink_perm(n, irem, iperm)
+        call shrink_perm(n, jrem, jperm)
+
+        ! Compute naive update
+        call setsize(self, n - k)
+        call permutematrix(self%target%matbuf(:n, :n), &
+                           iperm(:n-k), jperm(:n-k), &
+                           self%matbuf(:n-k, :n-k))
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_shrink_propose(self, t, irem, jrem)
+        type(MATRIX_SHRINK), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: irem(:), jrem(:)
+
+        logical, parameter :: debug_det_q = .false.
+        integer :: n, k, i, p, jrem_r(size(jrem))
+        type(EXT_RANGE) :: r_det
+
+        call p_init(t)
+        self%target => t
+
+        k = size(irem)
+        n = t%size - k
+        call shrink_setsize(self, n, k)
+
+        if (size(irem) /= size(jrem)) &
+            error stop 'Number of rows/columns to be removed must match'
+        if (.not. issorted(irem)) &
+            error stop 'Rows to be removed must be sorted'
+        if (.not. issorted(jrem)) &
+            error stop 'Cols to be removed must be sorted'
+
+        self%irem(:k) = irem(:)
+        self%jrem(:k) = jrem(:)
+
+        ! Basically, we perform the steps of the grow move in reverse. First,
+        ! we separate out the rows to be removed from the Q matrix:
+        !
+        !     [   ... ...   ] [ R R ... R R R ]
+        !     [   Q Q ... Q ] [ r R ... R R R ]
+        !     [ 1           ] [   r ... R R R ]
+        !     [   Q Q ... Q ] [     ... R R R ]
+        !     [   Q Q ... Q ] [         r R R ]
+        !     [   ... ...   ] [           r R ]
+        !
+        ! We only need to do this first to the rows to be remove (the rest
+        ! is deferred to the acceptance).
+        self%qrows(:k, :n+k) = t%qbuf(irem(:), :n+k)
+        call q_diagonalize(self%qrows(:k, :n+k), size(self%qrows, 1), &
+                           self%giv_q(:k, :n+k-1))
+
+        ! We must transform the diagonal matrix, which may still contain signs,
+        ! to the unit matrix in the upper left block. This implies undoing the
+        ! sign a permuting the rows to their proper positions, if needed.
+        self%det_q = t%det_q
+        p = 0
+        do i = 1, k
+            self%det_q = self%det_q * conjg(self%qrows(i, i))
+            p = p + irem(i) - i
+        enddo
+        if (mod(p, 2) /= 0) &
+            self%det_q = -self%det_q
+
+        ! Check determinant of Q against stored values
+        if (debug_det_q) then
+            self%q(:n+k, :n+k) = t%qbuf(:n+k, :n+k)
+            call rotate_back_q( &
+                    self%q(:n+k, :n+k), size(self%q, 1), &
+                    self%giv_q(:k, :n+k-1))
+            call assert_close( &
+                    p_determinant(self%q(:n+k, :n+k)), &
+                    extrange(t%det_q), rtol=1d-12)
+            call assert_close( &
+                    p_determinant(self%q(index_complement(irem, n+k), k+1:n+k)), &
+                    extrange(self%det_q), rtol=1d-12)
+        endif
+
+        ! We remove the first k rows of R. If we removed the trailing columns
+        ! (the inverse case of grow move), we would be done.  Since we don't,
+        ! we generically end up with a k-Hessenberg matrix.
+        if (n /= 0) then
+            jrem_r = t%jperm(jrem)
+            call copy_except_cols(t%rbuf(:n+k, :n+k), self%r(:n+k, :n), jrem_r)
+            call rotate_r(self%r(:n+k, :n), size(self%r, 1), &
+                          self%giv_q(:k, :n+k-1))
+            call qr_hessenberg(k, self%r(k+1:k+n, 1:n), size(self%r, 1), &
+                               self%giv_r(:k, :n-1))
+        endif
+        r_det = product_of_diagonal(self%r(k+1:n+k, :n))
+
+        ! Remove the rows also from the permutation array
+        call perm_remove(t%jperm(:n+k), jrem, self%jperm(:n))
+
+        self%det = r_det * self%det_q
+        if (perm_parity(self%jperm(:n))) &
+            self%det = -self%det
+
+        !call p_shrink_propose_naive(self%naive, t, irem, jrem)
+
+        ! XXX
+        !call assert_close(self%det, self%naive%det, 1d-2)
+        !self%det = self%naive%det
+    end
+
+    subroutine p_shrink_accept(self)
+        class(MATRIX_SHRINK), intent(inout) :: self
+        integer :: n, k
+        integer, dimension(self%newsize+self%rank) :: ishrink, jshrink
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        n = self%newsize
+        k = self%rank
+
+        if (n == 0) goto 99
+
+        ! We have now performed *two* sets of rotations, which we must apply
+        ! in the proper order to Q:
+        !
+        !                [Q giv_q^+] giv_r R'
+        !
+        ! where the square brackets denote the appropriate redimensioning of
+        ! the matrices by removal of rows/columns.
+        call copy_except_rows(self%target%qbuf(:n+k, :n+k), self%q(:n, :n+k), &
+                              self%irem(:k))
+        call rotate_back_q(self%q(:n, :n+k), size(self%q, 1), &
+                           self%giv_q(:k, :n+k-1))
+        call rotate_q(self%q(:n, k+1:n+k), size(self%q, 1), &
+                      self%giv_r(:k, :n-1))
+
+        self%target%rbuf(:n, :n) = self%r(k+1:n+k, :n)
+        self%target%qbuf(:n, :n) = self%q(:n, k+1:n+k)
+        self%target%jperm(:n) = self%jperm(:n)
+
+        ! Update matrix
+        call shrink_perm(n+k, self%irem(:k), ishrink)
+        call shrink_perm(n+k, self%jrem(:k), jshrink)
+        call permutematrix(self%target%matbuf(:n+k, :n+k), &
+                           ishrink(:n), jshrink(:n), self%q(:n, :n))
+        self%target%matbuf(:n, :n) = self%q(:n, :n)
+
+    99  continue
+        self%target%size = self%newsize
+        self%target%det = self%det
+        self%target%det_q = self%det_q
+
+        self%target => null()
+    end
+
+    function index_complement(idx, n) result(iout)
+        integer, intent(in) :: idx(:), n
+        integer, allocatable :: iout(:)
+        integer :: i, j
+
+        allocate(iout(n - size(idx)))
+
+        j = 0
+        do i = 1, n
+            if (any(idx == i)) &
+                cycle
+
+            j = j + 1
+            iout(j) = i
+        enddo
+
+        if (j /= size(iout)) &
+            error stop 'Invalid indices'
+    end
+
+    subroutine copy_except_cols(A, B, cols)
+        VALUE_TYPE, intent(in) :: A(:, :)
+        VALUE_TYPE, intent(out) :: B(:, :)
+        integer, intent(in) :: cols(:)
+        integer :: i, j
+
+        if (size(A, 1) /= size(B, 1)) &
+            error stop 'Number of rows must match'
+        if (size(A, 2) /= size(B, 2) + size(cols)) &
+            error stop 'Inconsistent number of columns'
+
+        j = 0
+        do i = 1, size(A, 2)
+            if (any(cols == i)) &
+                cycle
+
+            j = j + 1
+            B(:, j) = A(:, i)
+        enddo
+
+        if (j /= size(B, 2)) &
+            error stop 'Invalid entries in cols'
+    end
+
+    subroutine copy_except_rows(A, B, rows)
+        VALUE_TYPE, intent(in) :: A(:, :)
+        VALUE_TYPE, intent(out) :: B(:, :)
+        integer, intent(in) :: rows(:)
+        integer :: i, j
+
+        if (size(A, 2) /= size(B, 2)) &
+            error stop 'Number of rows must match'
+        if (size(A, 1) /= size(B, 1) + size(rows)) &
+            error stop 'Inconsistent number of columns'
+
+        j = 0
+        do i = 1, size(A, 1)
+            if (any(rows == i)) &
+                cycle
+
+            j = j + 1
+            B(j, :) = A(i, :)
+        enddo
+
+        if (j /= size(B, 1)) &
+            error stop 'Invalid entries in rows'
+    end subroutine
+
+    subroutine shrink_setsize(self, newsize, rank)
+        type(MATRIX_SHRINK), intent(inout) :: self
+        integer, intent(in) :: newsize, rank
+        integer :: oldsize
+
+        oldsize = newsize + rank
+        self%newsize = newsize
+        self%rank = rank
+        call reserve(self%irem, rank)
+        call reserve(self%jrem, rank)
+        call reserve(self%jperm, newsize)
+        call reserve(self%qrows, rank, oldsize)
+        call reserve(self%q, oldsize, oldsize)
+        ! XXX revisit once we project out necessary columns
+        call reserve(self%r, oldsize, oldsize)
+        call reserve_plane_rot(self%giv_q, rank, oldsize - 1)
+        call reserve_plane_rot(self%giv_r, rank, oldsize - 1)
+    end
+
+    ! ======================== updating functions =============================
+
+    pure logical function p_update_isinit(self) result(test)
+        type(LOW_RANK_UPDATE), intent(in) :: self
+
+        test = p_repl_isinit(self%naive)
+    end
+
+    subroutine p_update_init(self)
+        type(LOW_RANK_UPDATE), intent(inout) :: self
+
+        if (p_update_isinit(self)) return
+        call p_repl_init(self%naive)
+    end
+
+    subroutine p_update_propose_naive(self, t, u, vdag, iperm, jperm)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: iperm(:), jperm(:)
+        VALUE_TYPE, intent(in) :: u(:, :), vdag(:, :)
+
+        integer :: n, k
+        VALUE_TYPE :: matbuf(t%size, t%size)
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(u, 1)
+        k = size(u, 2)
+        if (self%target%size /= n) &
+            stop 'Mismactch between update and target size'
+        if (size(vdag, 1) /= k .or. size(vdag, 2) /= n) &
+            stop 'u * vdag is not a valid update for the target'
+        if (size(iperm) /= n .or. size(jperm) /= n) &
+            stop 'invalid size of permutation arrays'
+
+        call setsize(self, n)
+        matbuf(:, :) = t%matbuf(:n, :n)
+        if (k == 1) then
+            ! XXX this creates a temporary
+            call GERU(n, n, ONE, u(1,1), 1, vdag(1,1), 1, &
+                      matbuf(1,1), size(matbuf, 1))
+        else
+            call GEMM('U', 'U', n, n, k, &
+                      ONE, u(1,1), size(u, 1), vdag(1,1), size(vdag, 1), &
+                      ONE, matbuf(1,1), size(matbuf, 1))
+        endif
+        call p_permutematrix(matbuf, iperm, jperm, self%matbuf(:n, :n))
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_update_propose(self, t, u, vdag, iperm, jperm)
+        type(LOW_RANK_UPDATE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: iperm(:), jperm(:)
+        VALUE_TYPE, intent(in) :: u(:, :), vdag(:, :)
+
+        call p_update_init(self)
+        call p_init(t)
+        self%target => t
+
+        call p_update_propose_naive(self%naive, t, u, vdag, iperm, jperm)
+
+        self%det = self%naive%det
+    end
+
+    subroutine p_update_accept(self)
+        class(LOW_RANK_UPDATE), intent(inout) :: self
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        call self%naive%accept_update()
+        self%target => null()
+    end
+
+    ! ====================== row replace functions ===========================
+
+    pure logical function p_rows_isinit(self) result(test)
+        type(REPLACE_ROWS), intent(in) :: self
+
+        test = p_repl_isinit(self%naive)
+    end
+
+    subroutine p_rows_init(self)
+        type(REPLACE_ROWS), intent(inout) :: self
+
+        if (p_rows_isinit(self)) return
+        call p_repl_init(self%naive)
+    end
+
+    subroutine p_rows_propose_naive(self, t, ifrom, ito, val)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: ifrom(:), ito(:)
+        VALUE_TYPE, intent(in) :: val(:, :)
+
+        integer :: i, n, k, iperm(t%size)
+        VALUE_TYPE :: matbuf(t%size, t%size)
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(val, 2)
+        k = size(val, 1)
+        if (self%target%size /= n) &
+            stop 'Mismactch between update and target size'
+        if (size(ifrom) /= k .or. size(ito) /= k) &
+            stop 'invalid size of indices'
+
+        call setsize(self, n)
+        call move_perm(n, ifrom, ito, iperm(:n))
+
+        matbuf(:, :) = t%matbuf(:n, :n)
+        do i = 1, k
+            matbuf(ifrom(i), :) = val(i, :n)
+        enddo
+
+        self%matbuf(:n, :n) = matbuf(iperm, :)
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_rows_propose(self, t, ifrom, ito, val)
+        type(REPLACE_ROWS), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: ifrom(:), ito(:)
+        VALUE_TYPE, intent(in) :: val(:, :)
+
+        call p_rows_init(self)
+        call p_init(t)
+
+        self%target => t
+        call p_rows_propose_naive(self%naive, t, ifrom, ito, val)
+
+        self%det = self%naive%det
+    end
+
+    subroutine p_rows_accept(self)
+        class(REPLACE_ROWS), intent(inout) :: self
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        call self%naive%accept_update()
+        self%target => null()
+    end
+
+    ! ====================== columns replace functions ========================
+
+    pure logical function p_cols_isinit(self) result(test)
+        type(REPLACE_COLS), intent(in) :: self
+
+        test = p_repl_isinit(self%naive)
+    end
+
+    subroutine p_cols_init(self)
+        type(REPLACE_COLS), intent(inout) :: self
+
+        if (p_cols_isinit(self)) return
+        call p_repl_init(self%naive)
+    end
+
+    subroutine p_cols_propose_naive(self, t, jfrom, jto, val)
+        type(MATRIX_REPLACE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: jfrom(:), jto(:)
+        VALUE_TYPE, intent(in) :: val(:, :)
+
+        integer :: i, n, k, jperm(t%size)
+        VALUE_TYPE :: matbuf(t%size, t%size)
+
+        call p_repl_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(val, 1)
+        k = size(val, 2)
+        if (self%target%size /= n) &
+            stop 'Mismactch between update and target size'
+        if (size(jfrom) /= k .or. size(jto) /= k) &
+            stop 'invalid size of indices'
+
+        call setsize(self, n)
+        call move_perm(n, jfrom, jto, jperm(:n))
+
+        matbuf(:, :) = t%matbuf(:n, :n)
+        do i = 1, k
+            matbuf(:, jfrom(i)) = val(:n, i)
+        enddo
+
+        self%matbuf(:n, :n) = matbuf(:, jperm)
+        call p_repl_prepare(self)
+    end
+
+    subroutine p_cols_propose(self, t, jfrom, jto, val)
+        type(REPLACE_COLS), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: jfrom(:), jto(:)
+        VALUE_TYPE, intent(in) :: val(:, :)
+
+        call p_cols_init(self)
+        call p_init(t)
+
+        self%target => t
+        call p_cols_propose_naive(self%naive, t, jfrom, jto, val)
+
+        self%det = self%naive%det
+    end
+
+    subroutine p_cols_accept(self)
+        class(REPLACE_COLS), intent(inout) :: self
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        call self%naive%accept_update()
+        self%target => null()
+    end
+
+    ! ====================== permutation functions ========================
+
+    pure logical function p_permute_isinit(self) result(test)
+        type(MATRIX_PERMUTE), intent(in) :: self
+
+        test = allocated(self%iperm)
+    end
+
+    subroutine p_permute_init(self)
+        type(MATRIX_PERMUTE), intent(inout) :: self
+
+        if (p_permute_isinit(self)) return
+        call p_permute_setsize(self, 0)
+    end
+
+    subroutine p_permute_propose(self, t, iperm, jperm, iscale, jscale)
+        type(MATRIX_PERMUTE), intent(inout) :: self
+        type(UPDATABLE_MATRIX), intent(inout), target :: t
+        integer, intent(in) :: iperm(:), jperm(:)
+        VALUE_TYPE, intent(in) :: iscale(:), jscale(:)
+
+        integer :: n
+        VALUE_TYPE :: prod_iscale, prod_jscale
+
+        call p_permute_init(self)
+        call p_init(t)
+        self%target => t
+
+        n = size(self%target)
+        if (size(iperm) /= n .or. size(jperm) /= n) &
+            stop 'Mismatch between permutation and target size'
+        if (size(iscale) /= n .or. size(jscale) /= n) &
+            stop 'Mismatch between scale and target size'
+        if (any(abs(iscale) /= 1) .or. any(abs(jscale) /= 1)) &
+            stop 'Only rotation supported for now'
+
+        call setsize(self, n)
+        self%iperm(:n) = iperm
+        self%jperm(:n) = jperm
+        self%iscale(:n) = iscale
+        self%jscale(:n) = jscale
+
+        ! The determinant
+        self%det = self%target%det
+        self%det_q = self%target%det_q
+
+        if (perm_parity(self%iperm(:n), self%pwork)) then
+            self%det = -self%det
+            self%det_q = -self%det_q
+        endif
+        if (perm_parity(self%jperm(:n), self%pwork)) then
+            self%det = -self%det
+        endif
+
+        prod_iscale = product(iscale)
+        prod_jscale = product(jscale)
+        self%det = self%det * (prod_iscale * prod_jscale)
+        self%det_q = self%det_q * prod_iscale
+    end
+
+    subroutine p_permute_accept(self)
+        class(MATRIX_PERMUTE), intent(inout) :: self
+
+        integer :: n
+
+        if (.not. associated(self%target)) &
+            stop 'No move proposed'
+
+        n = self%size
+        self%target%det = self%det
+        self%target%det_q = self%det_q
+
+        self%buffer(:n, :n) = self%target%matbuf(:n, :n)
+        call scalematrix(self%buffer(:n, :n), self%iscale(:n), self%jscale(:n))
+        call permutematrix(self%buffer(:n, :n), self%iperm(:n), self%jperm(:n), &
+                           self%target%matbuf(:n, :n))
+
+        self%iscale(:n) = 1 / self%iscale(:n)
+        self%jscale(:n) = 1 / self%jscale(:n)
+
+        ! Undo permutation to get to column permutation
+        self%jscale(self%target%jperm(:n)) = self%jscale(:n)
+
+        self%buffer(:n, :n) = self%target%qbuf(:n, :n)
+        call p_scale_rows(self%buffer(:n, :n), self%iscale(:n))
+        self%target%qbuf(:n, :n) = self%buffer(self%iperm(:n), :n)
+
+        call p_scale_cols(self%target%rbuf(:n, :n), self%jscale(:n))
+        self%target%jperm(:n) = self%target%jperm(self%jperm(:n))
+
+        self%target => null()
+    end
+
+    subroutine p_scale_rows(a, si)
+        VALUE_TYPE, intent(inout) :: a(:, :)
+        VALUE_TYPE, intent(in) :: si(size(a,1))
+        integer :: i, j
+
+        do j = 1, size(a, 2)
+            do i = 1, size(a, 1)
+                a(i, j) = si(i) * a(i, j)
+            enddo
+        enddo
+    end
+
+    subroutine p_scale_cols(a, sj)
+        VALUE_TYPE, intent(inout) :: a(:, :)
+        VALUE_TYPE, intent(in) :: sj(size(a,2))
+        integer :: i, j
+
+        do j = 1, size(a, 2)
+            do i = 1, size(a, 1)
+                a(i, j) = sj(j) * a(i, j)
+            enddo
+        enddo
+    end
+
+    subroutine scalematrix(a, si, sj)
+        VALUE_TYPE, intent(inout) :: a(:, :)
+        VALUE_TYPE, intent(in) :: si(size(a,1)), sj(size(a,2))
+        integer :: i, j
+
+        do j = 1, size(a, 2)
+            do i = 1, size(a, 1)
+                a(i, j) = si(i) * a(i, j) * sj(j)
+            enddo
+        enddo
+    end
+
+    subroutine p_permute_setsize(self, newsize)
+        type(MATRIX_PERMUTE), intent(inout) :: self
+        integer, intent(in) :: newsize
+        integer :: cap
+
+        cap = max(newsize, 1)
+        call reserve(self%iperm, cap)
+        call reserve(self%jperm, cap)
+        call reserve(self%iscale, cap)
+        call reserve(self%jscale, cap)
+        call reserve(self%pwork, cap)
+        call reserve(self%buffer, cap, cap)
+        self%size = newsize
+    end
+
+    ! ===================== buffer routines ==============================
+
+    subroutine p_permutematrix(ain, iperm, jperm, aout)
+        VALUE_TYPE, intent(in) :: ain(:, :)
+        VALUE_TYPE, intent(out) :: aout(:, :)
+        integer, intent(in) :: iperm(:), jperm(:)
+
+        integer :: i, j
+
+        call check_selection(iperm, size(ain, 1), size(aout, 1))
+        call check_selection(jperm, size(ain, 2), size(aout, 2))
+
+        ! TODO: there are probaly some optimizations to be had here in terms
+        !       of memory locality ...
+        do j = 1, size(aout, 2)
+            do i = 1, size(aout, 1)
+                aout(i, j) = ain(iperm(i), jperm(j))
+            enddo
+        enddo
+    end
+
+    pure subroutine p_identity(a)
+        VALUE_TYPE, intent(out) :: a(:, :)
+        integer :: i, n
+
+        n = min(size(a, 1), size(a, 2))
+        a(:, :) = ZERO
+        do i = 1, n
+            a(i, i) = ONE
+        enddo
+    end
+
+    subroutine check_selection(sel, nin, nout)
+        integer, intent(in) :: sel(:), nin, nout
+        integer :: i
+
+        if (size(sel) /= nout) &
+            stop 'Selection mismatches size of output'
+        do i = 1, size(sel)
+            if (sel(i) < 1 .or. sel(i) > nin) &
+                stop 'Invalid column selected'
+        end do
+    end
+
+    subroutine reserve_plane_rot(buf, rowcap, colcap)
+        type(PLANE_ROTATION), allocatable, intent(inout) :: buf(:,:)
+        integer, intent(in) :: rowcap, colcap
+        type(PLANE_ROTATION), allocatable :: tmp(:,:)
+
+        if (allocated(buf)) then
+            if (rowcap <= size(buf, 1) .and. colcap <= size(buf, 2)) &
+                return
+            deallocate(buf)
+        endif
+        allocate(buf(rowcap, colcap))
+        if (allocated(tmp)) then
+            buf(:size(tmp, 1), :size(tmp, 2)) = tmp(:, :)
+        endif
+    end subroutine
+
+#ifndef VALUE_IS_COMPLEX
+    pure elemental function conjg_real(x) result(y)
+        REAL_TYPE, value :: x
+        REAL_TYPE :: y
+
+        y = x
+    end
+#endif
+
+end module

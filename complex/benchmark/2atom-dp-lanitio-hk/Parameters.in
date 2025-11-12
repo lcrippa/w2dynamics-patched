@@ -1,0 +1,46 @@
+[General]
+DOS = ReadIn
+HkFile = Hk_diag.dat
+beta = 10.0
+mu = 0.0
+totdens = 44.00
+EPSN = 0 #.001
+DMFTsteps = 20
+FileNamePrefix = LNTO
+readold = 0
+fileold = LNTO-2014-09-29-Mon-17-20-41.hdf5
+mixing = 0.5
+NAt = 2
+[Atoms]
+[[1]]
+Nd=5
+Np=0
+Hamiltonian = Density
+Udd = 5.0
+Jdd = 1.0
+Vdd = 3.0
+NSymMove = 1
+SymMove01 = 6 7 8 9 10 1 2 3 4 5
+QuantumNumbers = Nt Szt Azt
+[[2]]
+Nd=5
+Np=36
+Hamiltonian = Density
+Udd = 5.0
+Jdd = 1.0
+Vdd = 3.0
+NSymMove = 1
+SymMove01 = 6 7 8 9 10 1 2 3 4 5
+QuantumNumbers = Nt Szt Azt
+[QMC]
+Nwarmups = 2000000
+Nmeas = 10000
+NCorr = 5000
+truncation = 30
+Ntau = 2000
+Niw = 4000
+NLegMax = 40
+NLegOrder = 40
+Eigenbasis = 1
+Update_Trace = 1
+MeasDensityMatrix = 1

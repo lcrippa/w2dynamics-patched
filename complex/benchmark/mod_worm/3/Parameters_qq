@@ -1,0 +1,28 @@
+[General]
+DOS = EDcheck
+beta = 1.
+mu = -0.1
+#StatisticSteps = 1
+DMFTsteps = 0
+WormSteps = 1
+FileNamePrefix = qq_new
+
+[Atoms]
+[[1]]
+Hamiltonian = Density
+Udd = 2.
+Nd = 1
+
+[QMC]
+Nwarmups = 1e6
+Nwarmups2Plus = 1e6
+Nmeas = 5e5
+NCorr = 30
+Niw = 20
+WormMeasQQ_new = 1
+#WormMeasQQ = 1
+WormSearchEta = 1
+WormEta = 1
+WormComponents = 11,13,19,21,44,46,52,54
+PercentageWormInsert = 0.5
+Nbatchsize_nfft_worm = 1e5

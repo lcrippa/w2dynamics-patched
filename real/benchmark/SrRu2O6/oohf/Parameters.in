@@ -1,0 +1,55 @@
+#asdf
+[General]
+DOS = ReadIn
+HkFile = Hkdmft.dat
+beta = 32
+#mu = 0.0549111
+mu = 0
+totdens = 3.5
+EPSN = 0.001
+EPSEQ = 1
+NAt = 2
+DMFTsteps = 30
+#StatisticSteps=0
+fileold = asdf
+readold=0
+FileNamePrefix = SrRu2O6_3.5electrons___matrix_code
+magnetism=para
+#ParaMag=0
+FTType=legendre
+
+[Atoms]
+[[1]]
+Nd = 3
+Hamiltonian = Density
+Udd = 2.0
+Jdd = 0.2
+Vdd = 1.6
+QuantumNumbers = Nt Szt Azt
+NSymMove = 0 
+#SymMove01 = 2 1
+
+[[2]]
+Nd = 3
+Hamiltonian = Density
+Udd = 2.0
+Jdd = 0.2
+Vdd = 1.6
+QuantumNumbers = Nt Szt Azt
+NSymMove = 0
+#SymMove01 = 2 1
+
+[QMC]
+Nwarmups = 50000
+Nmeas = 25000
+NCorr = 1000
+truncation = 34   ## running with segment ==> trunc=1 !!
+Ntau =1399
+#NFtau=1399
+Niw = 1000
+NLegMax = 80
+NLegOrder = 80
+Eigenbasis=1
+PercentageGlobalMove=0.005
+segment=0
+MeasSusz=0

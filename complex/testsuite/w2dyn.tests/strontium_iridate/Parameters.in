@@ -1,0 +1,63 @@
+#asdf
+[General]
+DOS = ReadInSO
+HkFile = wannier90_hk_t2gbasis.dat_
+#HkFile = wannier90_hk_t2gbasis.dat_
+beta = 10
+totdens = 5.00
+EPSN = 0.001
+#mu = -0.72559
+DMFTsteps = 1
+StatisticSteps = 0
+FileNameFormat = "{prefix}.hdf5"
+FileNamePrefix = strontium_iridate
+#FileNamePrefix = reference_data
+readold = 1
+fileold = one_more_iter-2022-10-11-Tue-14-00-53.hdf5
+#fileold = one_more_iter-2022-10-11-Tue-14-00-53.hdf5
+magnetism = para
+NAt = 2
+mixing = 0.5
+EPSEQ=0.001
+siw_moments=estimate
+#FTType=none
+#dc=0.0,0.0,0.0,0.0,0.0,0.0,
+dc=-8.1584,-8.1584,-8.1584,-8.1584,-8.1584,-8.1584,
+#write = minimal
+WriteOnlyQuant = densitymatrix-new, fiw-full, ftau-full, gleg-full-new, gtau-full-new, h-mean, h-mom2, hist-new, lda-dens, lda-dos, lda-mu, mu, muimp-full, occ, rho1, sign-new, siw-full, smom-full
+[Atoms]
+[[1]]
+Nd=3
+Hamiltonian = Kanamori
+#Hamiltonian = ReadUmatrix
+#umatrix= u_matrix.dat
+QuantumNumbers = Nt All
+Udd = 2.234
+Vdd = 1.828
+Jdd = 0.203
+[[2]]
+Nd=3
+Hamiltonian = Kanamori
+#Hamiltonian = ReadUmatrix
+#umatrix= u_matrix.dat
+QuantumNumbers = Nt All
+Udd = 2.234
+Vdd = 1.828
+Jdd = 0.203
+[QMC]
+Nwarmups = 100000
+Nmeas = 500
+NCorr = 100
+Ntau = 500
+Niw = 2000
+NLegMax = 40
+NLegOrder = 40
+Eigenbasis = 1
+offdiag = 1
+complexHyb = 1
+complexLocTr = 1
+TaudiffMax = -1
+NSeed = 43890
+MeasDensityMatrix = 1
+Percentage4OperatorMove=0.005
+PercentageGlobalMove=0.005

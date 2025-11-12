@@ -1,0 +1,17 @@
+beta 30
+int-type density
+u-value 2.0
+j-value 0.5
+v-value 1.0
+mu 1.0
+eloc e0
+nflavours 4
+bath-e epsk
+bath-v vk
+niwf 2000
+ntau 2000
+steps 200000
+sweep-size 100
+warmup .10
+#int-type density
+#hybr-shape diagonal

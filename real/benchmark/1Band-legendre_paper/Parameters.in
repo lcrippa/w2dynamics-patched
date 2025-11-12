@@ -1,0 +1,34 @@
+[General]
+DOS 		= Bethe
+NAt 		= 1
+half-bandwidth  = 2,
+beta		= 45
+mu		= 2.0
+EPSN		= 0.0
+DMFTsteps	= 20
+magnetism	= para
+FileNamePrefix  = legendre_paper
+
+[Atoms]
+[[1]]
+Nd		= 1
+Hamiltonian	= Density
+Udd 		= 4.0
+QuantumNumbers  = Nt Szt Qzt
+NSymMove        =   1
+SymMove01	=   2 1 
+
+[QMC]
+Nwarmups 	= 10000		# # of warm up sweeps
+Nmeas 		= 1000000         	# # of measurements
+NCorr           = 100
+truncation      = 2
+Ntau       	= 500   	# # of points in tau
+Niw        	= 2000    	# # of matsubara freq.
+NLegMax     	= 100     	# Max order of Legendre Polys
+NLegOrder   	= 100     	# order used 
+MeasDensityMatrix=1
+Eigenbasis=1
+Nice_SelfEnergy=0
+MeasGtauDetRat=0
+

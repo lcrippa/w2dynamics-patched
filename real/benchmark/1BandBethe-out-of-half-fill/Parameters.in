@@ -1,0 +1,36 @@
+[General]
+DOS 		= Bethe
+NAt 		= 1
+half-bandwidth  = 1,
+beta		= 30
+mu		= -2.0
+totdens		= 0.358408 
+EPSN 		= 0.0005
+DMFTsteps	= 30
+magnetism	= para
+FileNamePrefix  = mu_search
+mixing 		= 0.2
+
+[Atoms]
+[[1]]
+Nd		= 1
+Hamiltonian	= Density
+Udd 		= 3.34
+QuantumNumbers  = Nt Szt Qzt
+NSymMove        =   1
+SymMove01	=   2 1 
+
+[QMC]
+Nwarmups 	= 1000000		# # of warm up sweeps
+Nmeas 		= 160000         	# # of measurements
+NCorr           = 50
+truncation      = 2
+Ntau       	= 500   	# # of points in tau
+Niw        	= 200    	# # of matsubara freq.
+NLegMax     	= 30     	# Max order of Legendre Polys
+NLegOrder   	= 30     	# order used 
+MeasDensityMatrix=1
+Eigenbasis=1
+Nice_SelfEnergy=0
+MeasGtauDetRat=0
+

@@ -1,0 +1,76 @@
+I have carried out the runs: 
+E_bip/D = 0.0,  0.5, 1.0
+D = 0.75 eV
+
+
+#####
+Compiling. 
+ I have included all the libraries  you need apart from the standard lapack and blas.  To compile the different part of the codes do the following: 
+a) ./lib_90 just type make. This should compile the libraries. (ifort is needed)
+b) ./Self   edit the Makefile and change the paths HOME1 (to the above lib_90 directory)  and HOME (to the blas and lapack libs)
+c) Same as b but for ./CTQMC and ./Analysis. 
+
+Hope that this works!
+
+#### 
+Running the code.
+The bash file iterations.c  runs the  simulation.  (Just type bash iterations.c)  It is maybe a good idea to start here to see  how things are organized.  You will have to check the paths.  
+
+The input files are in  the directory Start. 
+a) DOS_NaCoO2.dat is your density of states.
+b) param_CDMFT  is the parameter file containing: 
+
+BETA :: inverse temperature
+CHEM :: chemical potential
+U_hub :: Hubbard U   
+g2d2k :: This corresponds to E_bip/2   = g^2/2k.   ( In the antiadiabatic limit: U_eff = U - E_bip ) 
+omega_0 :: Phonon frequency.
+NFPS    ::  Number of flips (i.e  adding or removing a vertex) per sweep.  
+NSPB    ::  Number of sweeps per bin (At the end of each sweep one carries out the measurement) 
+NBIN    :: Number of bins. The result of each bin is written on the disk.   Processing (i.e. average and error is done separately)  
+del      ::   This should be set to 0.51 (corresponds to the alphas) 
+dtau_obs ::   Time step for measurements on the imaginary time axis. 
+dtau     ::    Time step for the tabulation of  the bath Green functions (This should be small) 
+Niom     ::    Number of Matsubara frequencies. 
+N_recalc_fre :: To test for accuracy. Once in a while  M^-1 is recalculated from scratch   and  compared with the update version.  
+
+c) restart.c : 
+cleans up  and overwrites  new to old bath Green functions from iteration to iteration.
+
+
+
+At the beginning self.out  sets the self energy to zero and computes the up and down bath Green functions corresponding
+ to the files:
+g_iom_0_do   matsubara frequency.
+g_iom_0_up   matsubara frequency.
+g_tau_0_do   imaginary time
+g_tau_0_up   imaginary time
+
+
+The  CTQMC code CTQMC/CTQMC.out reads in  the   bath Green functions g_iom_0 and g_tau_0   in both up and down 
+spin sectors and produces 
+a) grtot_iom, interacting Green functions (average of up and down) in Matsubara frequency. (These are the separate bins, and will still have to be processed  to obtain the mean and error.    This file is read in by Self/self.out.
+b) ener :   This files contains scalar observables  which are processed by the  Analysis/jackv4.out.
+The final result is  found in enerJ and contains the  average expansion parameter, the magnetization (should be zero!), the particle number , the average sign  and double occupancy.  
+c) Confout The final configuration of vertices. 
+
+
+At the end of the CTQMC run,  you can run Self/self.out.  This will read in the QMC data, and produce the  following: 
+a)
+the new bath Green functions. (up and down are equal, but the CTQMC needs separate up and down Green functions as input 
+since SU(2) symmetry is not assumed.)
+g_iom_0_do_new   matsubara frequency.
+g_iom_0_up_new   matsubara frequency.
+g_tau_0_do_new   imaginary time
+g_tau_0_up_new   imaginary time
+
+b) G_iom_qmc   The  interacting Matsubara Green function. 
+omega_m   Real(G_iom), Err( Real(Giom) ),  Im( G_iom ), Err( Im(Giom) )
+
+c) Sigma_iom_qmc: The self energy. (No errors on this quantity. One could of course produce them) 
+
+
+At this point one can start the next  iteration.  (see file iterations.c). 
+
+
+

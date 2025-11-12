@@ -1,0 +1,34 @@
+[General]
+DOS = EDcheck
+beta = 10.
+mu = 7.
+StatisticSteps = 1
+DMFTsteps = 0
+#WormSteps = 1
+FileNamePrefix = g_2orb
+FTType = none
+
+[Atoms]
+[[1]]
+Hamiltonian = Kanamori
+Udd = 5.
+Vdd = 3.5
+Jdd = 0.75
+Nd = 2
+
+[QMC]
+Nwarmups = 1e6
+#Nwarmups2Plus = 1e6
+TaudiffMax = 100
+Nmeas = 2e6
+NCorr = 100
+Niw = 50
+MeasGiw = 1
+MeasDensityMatrix = 1
+#WormMeasQQ_new = 1
+#WormMeasQQ = 1
+#WormSearchEta = 1
+#WormEta = 1
+#WormComponents = 11,13,19,21,44,46,52,54
+#PercentageWormInsert = 0.5
+Nbatchsize_nfft_worm = 1e5

@@ -1,0 +1,44 @@
+[General]
+DOS=ReadIn
+HkFile=hubbard_2d_48_48_1.hk
+beta=5.
+NAt=1
+EPSN=1e-6
+totdens = 0.85
+#mu=2.5
+DMFTsteps = 20
+StatisticSteps=0
+WormSteps = 0
+FileNamePrefix=hub2d_U2_b2
+magnetism=para
+siw_moments=estimate
+FTType=none_worm
+SelfEnergy = symmetric_improved_worm
+mixing=0.2
+#fileold = hub2d_U2_b2-2019-11-14-Thu-11-02-12.hdf5
+#readold = 5
+
+
+[Atoms]
+[[1]]
+Hamiltonian=Density
+Udd=5.0
+Nd=1
+
+
+[QMC]
+Nwarmups = 1e5
+Nwarmups2Plus = 2e5
+Nmeas = 2e5
+NCorr = 25
+Ntau = 1000
+Niw = 2000
+Eigenbasis = 1
+
+WormMeasQQ = 1
+
+PercentageWormInsert = 0.25
+PercentageWormReplace = 0.25
+WormSearchEta = 1
+WormEta = 0.6
+WormComponents = 1, 4

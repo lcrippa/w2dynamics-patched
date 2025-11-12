@@ -1,0 +1,39 @@
+[General]
+DOS 		= EDcheck
+NAt 		= 1
+half-bandwidth  = 1,2
+beta		= 50
+mu		= 2.5
+EPSN=0.0
+DMFTsteps=0
+StatisticSteps=1
+magnetism=para
+FileNamePrefix  = EDcheck_CIRO
+
+[Atoms]
+[[1]]
+Nd=1
+Hamiltonian=Density
+Udd 		= 5.0
+Jdd 		= 0.5
+Vdd             = 1.0
+QuantumNumbers  = Nt Szt Qzt
+NSymMove        =   1
+SymMove01	=   2 1 
+
+[QMC]
+Nwarmups 	= 50000		# # of warm up sweeps
+Nmeas 		= 8000000         	# # of measurements
+NCorr           = 50
+truncation      = 2
+NSeed = 43855
+Ntau       	= 500   	# # of points in tau
+Niw        	= 200    	# # of matsubara freq.
+NLegMax     	= 80     	# Max order of Legendre Polys
+NLegOrder   	= 80     	# order used 
+MeasDensityMatrix=1
+Eigenbasis=1
+Nice_SelfEnergy=0
+MeasGtauDetRat=0
+segment=1
+MeasSusz=0
