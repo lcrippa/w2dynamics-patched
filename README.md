@@ -9,8 +9,8 @@ terms and phonons.
 
 Correct way of fixing bugs:
 
-- clone the appropriate branch from the w2dynamics gitlab repo
-- apply the relative real/complex patch here
+- clone the appropriate branch from the w2dynamics gitlab repo in a safe path
+- apply the relative real/complex patch from this repo
 - does it apply correctly?
 - YES:
     - make your modifications
@@ -18,8 +18,10 @@ Correct way of fixing bugs:
     - git diff > NEW_PATCH_NAME.patch
     - save the new patch as real/complex in the appropriate folder
     - git reset
-    - clean your repo
-    - please port the same changes (by hand) in the complex/real repos here, for safety and consistency
+    - clean your repo (or remove the folder if you don't need it anymore)
+    - please port the same changes (by hand) in the complex/real folders here, for safety and consistency. DO NOT try to apply the new patch, these are older versions of the code!
+      Only port modifications relating to DC / Phonons/ Mixing
+    - comment clearly, push to this repo
 - NO:
     - try to fix conflicts by hand
     - go to YES
