@@ -1,0 +1,1895 @@
+diff --git a/DMFT.py b/DMFT.py
+index 11070a55..a79bd4ee 100755
+--- a/DMFT.py
++++ b/DMFT.py
+@@ -291,9 +291,31 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
+ 
+ restarted_run = cfg["General"]["readold"]
+ 
++sigma_kick = cfg["General"]["sigma_kick"]
++sigma_kick_persist = cfg["General"]["sigma_kick_persist"]
++
+ siw_mixer = mixing.FlatMixingDecorator(
+     mixing.LinearMixer(cfg["General"]["mixing"]))
++    
+ mu_mixer = mixing.LinearMixer(cfg["General"]["mu_mixing"])
++#dc_mixer = mixing.StaggeredMixingDecorator(4,1,5,mixing.LinearMixer())
++if cfg["General"]["dc_mixing_strategy"] == "linear":
++    print("Initializing DC mixer as LINEAR mixer")
++    dc_mixer = mixing.StaggeredMixingDecorator(cfg["General"]["dc_subblock"],cfg["General"]["dc_subblock_step"],cfg["General"]["dc_rest_step"],
++        mixing.LinearMixer(cfg["General"]["dc_mixing"]))
++elif cfg["General"]["dc_mixing_strategy"] == "diis":
++    print("Initializing DC mixer as DIIS mixer")
++    dc_mixer = mixing.StaggeredMixingDecorator(cfg["General"]["dc_subblock"],cfg["General"]["dc_subblock_step"],cfg["General"]["dc_rest_step"],
++        mixing.DiisMixer(cfg["General"]["dc_mixing"],
++                         cfg["General"]["mixing_diis_history"],
++                         cfg["General"]["mixing_diis_period"]))
++#dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
++#    mixing.LinearMixer(cfg["General"]["dc_mixing"])))
++#dc_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
++#    mixing.DiisMixer(cfg["General"]["dc_mixing"],
++#                     cfg["General"]["mixing_diis_history"],
++#                     cfg["General"]["mixing_diis_period"])))
++
+ if "diis" == cfg["General"]["mixing_strategy"]:
+     siw_mixer = mixing.FlatMixingDecorator(mixing.RealMixingDecorator(
+         mixing.DiisMixer(cfg["General"]["mixing"],
+@@ -304,7 +326,7 @@ if not restarted_run:
+ dmft_step = selfcons.DMFTStep(
+       beta, mylattice, ineq_list, niw, nftau, dc_dp, dc_dp_orbitals,
+       GW, GW_KAverage, natoms, dc, udd_full, udp_full, upp_full,
+-      paramag, siw_mixer, mu_mixer, mpi_comm
++      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm, sigma_kick ,sigma_kick_persist
+       )
+ 
+ if restarted_run:
+@@ -429,7 +451,18 @@ if restarted_run:
+ 
+     log("Continuing old run at old self-energy for %s mu = %.6g ...",
+         mu_source_string, mu)
+-    dmft_step.set_siws(siw_dd, smom_dd, init=True)
++    #this is a modification we made, so that the dc is read from the converged file.
++    #useful when that is actually a mf decoupled term
++    dc_type = cfg["General"]["dc"]
++    if isinstance(dc_type, list):
++        dc_user_values = np.array(dc_type, float)
++        if dc_user_values.size != mylattice.norbitals:
++            raise ValueError("Expected %d elements" % mylattice.norbitals)
++        dc_user_values = np.repeat(dc_user_values[:,None], mylattice.nspins, 1)
++        dc_user_values = orbspin.promote_diagonal(dc_user_values)
++        dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_user_values, init=True)
++    else:
++        dmft_step.set_siws(siw_dd, smom_dd, dc_full=dc_value, init=True)
+     dmft_step.set_mu(mu)
+ else:
+     log("Starting new run without self-energy for %s mu = %.6g ...",
+@@ -486,7 +519,7 @@ for iter_no in range(total_iterations + 1):
+                        or (mu_method in ('kappa', 'curvefit') and not kmuiter.has_mu())):
+             log("Computing lattice problem for old mu = %g ...", dmft_step.mu)
+             dmft_step.siw2gloc()
+-            log("Total density = %g", np.real_if_close(dmft_step.densities.sum()))
++            log("Total density = %g", np.real_if_close(np.real(dmft_step.densities).sum()))
+ 
+             log("Writing lattice quantities for old mu to output file ...")
+             dmft_step.write_before_mu_search(output,
+@@ -499,7 +532,7 @@ for iter_no in range(total_iterations + 1):
+ 
+     log("Computing lattice problem for mu = %g ...", dmft_step.mu)
+     dmft_step.siw2gloc()
+-    log("Total density = %g", np.real_if_close(dmft_step.densities.sum()))
++    log("Total density = %g", np.real_if_close(np.real(dmft_step.densities).sum()))
+ 
+     log("Writing lattice quantities to output file ...")
+     dmft_step.write_lattice_problem(output,
+diff --git a/testutils/create_umatrix/compare.sh b/testutils/create_umatrix/compare.sh
+new file mode 100755
+index 00000000..107a1169
+--- /dev/null
++++ b/testutils/create_umatrix/compare.sh
+@@ -0,0 +1,15 @@
++#!/bin/zsh
++
++NLINES=$(cat u_matrix_template.dat | wc -l)
++
++for i in {3..$NLINES}; do
++  LINE=$(head -n $i u_matrix_template.dat | tail -n 1)
++  INDICES=$(echo $LINE | awk '{print $1" "$2" "$3" "$4" "$5" "$6" "$7" "$8}')
++  MATCHING=$(cat u_matrix.dat | grep $INDICES | wc -l)
++  if [ $MATCHING = "0" ]; then
++    echo "LINE $i DOESN'T MATCH"
++    exit
++  fi
++done
++echo "FILES MATCH!"
++
+diff --git a/testutils/create_umatrix/generate_u_matrix.py b/testutils/create_umatrix/generate_u_matrix.py
+new file mode 100755
+index 00000000..345b4f23
+--- /dev/null
++++ b/testutils/create_umatrix/generate_u_matrix.py
+@@ -0,0 +1,107 @@
++#!/usr/bin/env python3
++import numpy as np
++import os,sys
++
++try:
++    lbd=float(sys.argv[1])
++except:
++    lbd=-1.1
++try:
++    alpha22=float(sys.argv[2])
++except:
++    alpha22=2.1
++try:
++    scale_u=float(sys.argv[3])
++except:
++    scale_u=1.0
++
++NBANDS=4
++
++alpha22=alpha22**2
++interactionmatrix=np.zeros([NBANDS,2,NBANDS,2,NBANDS,2,NBANDS,2])
++list_of_indices=np.array([[1,2,4,3],\
++                          [2,1,3,4],\
++                          [1,3,4,2],\
++                          [3,1,2,4],\
++                          [2,3,3,2],\
++                          [3,2,2,3],\
++                          [1,4,4,1],\
++                          [4,1,1,4],\
++                          [2,4,3,1],\
++                          [4,2,1,3],\
++                          [3,4,2,1],\
++                          [4,3,1,2]])
++x_coeffs=-1*np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
++y_coeffs=-1*np.array([+1,+1,-1,-1,-1,-1,-1,-1,-1,-1,+1,+1])
++
++for iband in range(4):
++    for jband in range(4):
++        for kband in range(4):
++            for lband in range(4):
++                orbvector=[iband+1,jband+1,kband+1,lband+1]
++                for itest in range(np.shape(list_of_indices)[0]):
++                    if np.array_equal(orbvector,list_of_indices[itest]):
++                        for ispin in range(2):
++                            for jspin in range(2):
++                                interactionmatrix[iband,ispin,jband,jspin,kband,ispin,lband,jspin] = -1*lbd*alpha22*(x_coeffs[itest]+(y_coeffs[itest]))
++                                break
++                
++
++kanamori_umatrix = np.genfromtxt("u_matrix_template.dat",dtype='str')
++np.shape(kanamori_umatrix)
++kanamori_umatrix[0:3,:]
++
++for iline in range(np.shape(kanamori_umatrix)[0]):
++    uvalue=float(kanamori_umatrix[iline,8])*scale_u
++    iband=int(kanamori_umatrix[iline,0])-1
++    jband=int(kanamori_umatrix[iline,2])-1
++    kband=int(kanamori_umatrix[iline,4])-1
++    lband=int(kanamori_umatrix[iline,6])-1
++    if kanamori_umatrix[iline,1]=="u":
++        ispin=0
++    else:
++        ispin=1
++    if kanamori_umatrix[iline,3]=="u":
++        jspin=0
++    else:
++        jspin=1
++    if kanamori_umatrix[iline,5]=="u":
++        kspin=0
++    else:
++        kspin=1
++    if kanamori_umatrix[iline,7]=="u":
++        lspin=0
++    else:
++        lspin=1
++    interactionmatrix[iband,ispin,jband,jspin,kband,kspin,lband,lspin] += uvalue
++
++def sud(ispin):
++    if(ispin)==0:
++        spinstring="u"
++    else:
++        spinstring="d"
++    return spinstring
++
++
++fname="u_matrix.dat"
++f=open(fname,'w')
++f.write(' '.join([str(NBANDS),"BANDS"]))
++f.write("\n")
++for iband in range(4):
++    for ispin in range(2):
++        for jband in range(4):
++            for jspin in range(2):
++                for kband in range(4):
++                    for kspin in range(2):
++                        for lband in range(4):
++                            for lspin in range(2):
++                                uvalue=interactionmatrix[iband,ispin,jband,jspin,kband,kspin,lband,lspin]
++                                if abs(uvalue) > 1e-15:
++                                    orbvector=[str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(lspin)]
++                                    print(str(iband+1),sud(ispin),str(jband+1),sud(jspin),str(kband+1),sud(kspin),str(lband+1),sud(lspin),uvalue)
++                                    for icomp in range(8):
++                                        f.write(orbvector[icomp])
++                                        f.write(" ")
++                                    f.write(str(uvalue))
++                                    f.write("\n")
++f.close()
+diff --git a/testutils/create_umatrix/test.nb b/testutils/create_umatrix/test.nb
+new file mode 100644
+index 00000000..20db21fe
+--- /dev/null
++++ b/testutils/create_umatrix/test.nb
+@@ -0,0 +1,344 @@
++(* Content-type: application/mathematica *)
++
++(*** Wolfram Notebook File ***)
++(* http://www.wolfram.com/nb *)
++
++(* CreatedBy='Mathematica 7.0' *)
++
++(*CacheID: 234*)
++(* Internal cache information:
++NotebookFileLineBreakTest
++NotebookFileLineBreakTest
++NotebookDataPosition[       145,          7]
++NotebookDataLength[     12933,        336]
++NotebookOptionsPosition[     11107,        299]
++NotebookOutlinePosition[     11605,        317]
++CellTagsIndexPosition[     11562,        314]
++WindowFrame->Normal*)
++
++(* Beginning of Notebook Content *)
++Notebook[{
++Cell[TextData[StyleBox["Print out Hamiltonian", "Chapter"]], "Text",
++ CellChangeTimes->{{3.882256214977701*^9, 
++  3.882256220265285*^9}},ExpressionUUID->"78daf23f-fa74-48e7-a3e4-\
++e50f3639f323"],
++
++Cell[CellGroupData[{
++
++Cell[BoxData[{
++ RowBox[{
++  RowBox[{"P", "=", 
++   RowBox[{
++    RowBox[{"(", 
++     RowBox[{"DecimalForm", "[", 
++      RowBox[{"N", "[", 
++       RowBox[{"SetPrecision", "[", 
++        RowBox[{"#", ",", "6"}], "]"}], "]"}], "]"}], ")"}], "&"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"file", "=", 
++   RowBox[{"OpenWrite", "[", 
++    RowBox[{
++     RowBox[{
++      RowBox[{"NotebookDirectory", "[", "]"}], "<>", 
++      "\"\<hk_tas2_hex_100.dat\>\""}], ",", 
++     RowBox[{"FormatType", "\[Rule]", "StandardForm"}]}], "]"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{"Write", "[", 
++  RowBox[{"file", ",", 
++   RowBox[{"Length", "[", "kmesh", "]"}], ",", "\"\< \>\"", ",", "NorbTot", 
++   ",", "\"\< \>\"", ",", "NorbTot"}], "]"}], "\[IndentingNewLine]", 
++ RowBox[{"For", "[", 
++  RowBox[{
++   RowBox[{"i", "=", "1"}], ",", 
++   RowBox[{"i", "\[LessEqual]", 
++    RowBox[{"Length", "[", "kmesh", "]"}]}], ",", 
++   RowBox[{"i", "++"}], ",", "\[IndentingNewLine]", 
++   RowBox[{
++    RowBox[{"ind", "=", 
++     RowBox[{
++      RowBox[{"kpoint", "[", 
++       RowBox[{"[", "i", "]"}], "]"}], "[", 
++      RowBox[{"[", "3", "]"}], "]"}]}], ";", "\[IndentingNewLine]", 
++    RowBox[{"Write", "[", 
++     RowBox[{"file", ",", 
++      RowBox[{"P", "@", 
++       RowBox[{
++        RowBox[{"kpoint", "[", 
++         RowBox[{"[", "i", "]"}], "]"}], "\[LeftDoubleBracket]", "1", 
++        "\[RightDoubleBracket]"}]}], ",", "\"\< \>\"", ",", 
++      RowBox[{"P", "@", 
++       RowBox[{
++        RowBox[{"kpoint", "[", 
++         RowBox[{"[", "i", "]"}], "]"}], "\[LeftDoubleBracket]", "2", 
++        "\[RightDoubleBracket]"}]}], ",", "\"\< \>\"", ",", 
++      RowBox[{"P", "@", "0.0"}]}], "]"}], ";", "\[IndentingNewLine]", 
++    RowBox[{"For", "[", 
++     RowBox[{
++      RowBox[{"n", "=", "1"}], ",", 
++      RowBox[{"n", "\[LessEqual]", "NorbTot"}], ",", 
++      RowBox[{"n", "++"}], ",", "\[IndentingNewLine]", 
++      RowBox[{
++       RowBox[{"For", "[", 
++        RowBox[{
++         RowBox[{"m", "=", "1"}], ",", 
++         RowBox[{"m", "\[LessEqual]", "NorbTot"}], ",", 
++         RowBox[{"m", "++"}], ",", "\[IndentingNewLine]", 
++         RowBox[{
++          RowBox[{"WriteString", "[", 
++           RowBox[{"file", ",", 
++            RowBox[{"P", "@", 
++             RowBox[{"Re", "[", 
++              RowBox[{
++               RowBox[{
++               "HamGrid", "\[LeftDoubleBracket]", "ind", 
++                "\[RightDoubleBracket]"}], "\[LeftDoubleBracket]", 
++               RowBox[{"n", ",", "m"}], "\[RightDoubleBracket]"}], "]"}]}], 
++            ",", "\"\< \>\"", ",", 
++            RowBox[{"P", "@", 
++             RowBox[{"Im", "[", 
++              RowBox[{
++               RowBox[{
++               "HamGrid", "\[LeftDoubleBracket]", "ind", 
++                "\[RightDoubleBracket]"}], "\[LeftDoubleBracket]", 
++               RowBox[{"n", ",", "m"}], "\[RightDoubleBracket]"}], "]"}]}], 
++            ",", "\"\< \>\""}], "]"}], ";"}]}], "\[IndentingNewLine]", "]"}], 
++       ";", " ", 
++       RowBox[{"WriteString", "[", 
++        RowBox[{"file", ",", "\"\<\\n\>\""}], "]"}]}]}], 
++     "\[IndentingNewLine]", "]"}], ";"}]}], "\[IndentingNewLine]", 
++  "]"}], "\[IndentingNewLine]", 
++ RowBox[{"Close", "[", "file", "]"}]}], "Input",
++ CellChangeTimes->{{3.9004880553830233`*^9, 3.9004880608246603`*^9}, {
++  3.9004889425086727`*^9, 3.9004889724922256`*^9}, {3.9004935157505074`*^9, 
++  3.9004935160970373`*^9}, {3.900493689922945*^9, 3.9004936905334044`*^9}},
++ CellLabel->"In[60]:=",ExpressionUUID->"9df1f9c4-0ac1-4cdb-9c0d-a6a3e12a087c"],
++
++Cell[BoxData["\<\"/home/lorenzo/tools/projects/TaS2/fermisurface/anacont/data/\
++hk_tas2_hex_100.dat\"\>"], "Output",
++ CellChangeTimes->{
++  3.882261227935402*^9, 3.8822699793225317`*^9, 3.882272522316299*^9, 
++   3.882609624794963*^9, 3.882845963165429*^9, 3.883533708897224*^9, {
++   3.8896142945059433`*^9, 3.8896143265075274`*^9}, 3.88961454148836*^9, 
++   3.8896166885694017`*^9, 3.8896184671735973`*^9, 3.9004836173856163`*^9, 
++   3.900483854521123*^9, {3.9004838966320953`*^9, 3.9004839042853947`*^9}, {
++   3.900484065233849*^9, 3.900484085262911*^9}, {3.900484152357275*^9, 
++   3.900484182453877*^9}, 3.900484603884602*^9, 3.900486328885638*^9, 
++   3.900486386322094*^9, {3.900486456070883*^9, 3.900486466535503*^9}, 
++   3.9004867234645853`*^9, 3.9004875770607853`*^9, 3.900487644914957*^9, 
++   3.900487787486671*^9, 3.900487985193686*^9, {3.900488056603599*^9, 
++   3.900488073834364*^9}, 3.900488393150749*^9, 3.900488987965912*^9, 
++   3.90048905710019*^9, 3.9004892634862967`*^9, 3.900489323445241*^9, 
++   3.9004895247424517`*^9, 3.900491337621518*^9, 3.900491464227647*^9, 
++   3.9004915079584303`*^9, {3.9004915459454517`*^9, 3.900491563817274*^9}, 
++   3.9004916167017183`*^9, 3.9004916957586737`*^9, 3.9004920023781652`*^9, 
++   3.900492056342669*^9, 3.9004928160598793`*^9, 3.900493580731996*^9, 
++   3.9004936765586243`*^9, 3.900493768187585*^9},
++ CellLabel->"Out[64]=",ExpressionUUID->"9bf9a792-42f6-4892-b372-0177fe65c6b6"]
++}, Open  ]],
++
++Cell[TextData[StyleBox["Matrix elements", "Chapter"]], "Text",
++ CellChangeTimes->{{3.882256214977701*^9, 3.882256220265285*^9}, {
++  3.908116038089016*^9, 
++  3.9081160407875853`*^9}},ExpressionUUID->"2b279165-2d18-4747-917b-\
++024bbce41960"],
++
++Cell[BoxData[{
++ RowBox[{
++  RowBox[{"sx", "=", 
++   RowBox[{"{", 
++    RowBox[{
++     RowBox[{"{", 
++      RowBox[{"0", ",", "1"}], "}"}], ",", 
++     RowBox[{"{", 
++      RowBox[{"1", ",", "0"}], "}"}]}], "}"}]}], ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"sy", "=", 
++   RowBox[{"{", 
++    RowBox[{
++     RowBox[{"{", 
++      RowBox[{"0", ",", 
++       RowBox[{"-", "\[ImaginaryI]"}]}], "}"}], ",", 
++     RowBox[{"{", 
++      RowBox[{"\[ImaginaryI]", ",", "0"}], "}"}]}], "}"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"tx", "=", 
++   RowBox[{"{", 
++    RowBox[{
++     RowBox[{"{", 
++      RowBox[{"0", ",", "1"}], "}"}], ",", 
++     RowBox[{"{", 
++      RowBox[{"1", ",", "0"}], "}"}]}], "}"}]}], ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"ty", "=", 
++   RowBox[{"{", 
++    RowBox[{
++     RowBox[{"{", 
++      RowBox[{"0", ",", 
++       RowBox[{"-", "\[ImaginaryI]"}]}], "}"}], ",", 
++     RowBox[{"{", 
++      RowBox[{"\[ImaginaryI]", ",", "0"}], "}"}]}], "}"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"Ax", "=", 
++   RowBox[{"KroneckerProduct", "[", 
++    RowBox[{"tx", ",", "sx"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"Ay", "=", 
++   RowBox[{"KroneckerProduct", "[", 
++    RowBox[{"ty", ",", "sx"}], "]"}]}], ";"}]}], "Input",
++ CellChangeTimes->{{3.908116043204555*^9, 3.908116073603454*^9}, {
++  3.9081161169004393`*^9, 3.908116152853553*^9}},
++ CellLabel->"In[24]:=",ExpressionUUID->"34883b3c-11c6-4f2c-9a3d-6c0d72344bc0"],
++
++Cell[BoxData[{
++ RowBox[{
++  RowBox[{"phidag", "=", 
++   RowBox[{"{", 
++    RowBox[{"g1", ",", "g2", ",", "g3", ",", "g4"}], "}"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{
++  RowBox[{"phi", "=", 
++   RowBox[{"{", 
++    RowBox[{"c1", ",", "c2", ",", "c3", ",", "c4"}], "}"}]}], ";"}]}], "Input",\
++
++ CellChangeTimes->{{3.908116079925336*^9, 3.908116109749217*^9}},
++ CellLabel->"In[9]:=",ExpressionUUID->"5023ce70-d61f-436a-bb8d-e31de49b7bc2"],
++
++Cell[CellGroupData[{
++
++Cell[BoxData[
++ RowBox[{"(", 
++  RowBox[{"phidag", ".", "Ax", ".", "phi"}], ")"}]], "Input",
++ CellChangeTimes->{{3.9081161939275093`*^9, 3.9081162420697536`*^9}, {
++  3.908116291527718*^9, 3.908116293094293*^9}},
++ CellLabel->"In[34]:=",ExpressionUUID->"dca8909e-3ce3-4025-9480-bbad5cbb9d24"],
++
++Cell[BoxData[
++ RowBox[{
++  RowBox[{"c4", " ", "g1"}], "+", 
++  RowBox[{"c3", " ", "g2"}], "+", 
++  RowBox[{"c2", " ", "g3"}], "+", 
++  RowBox[{"c1", " ", "g4"}]}]], "Output",
++ CellChangeTimes->{{3.908116211778841*^9, 3.908116242709578*^9}, 
++   3.908116294223277*^9},
++ CellLabel->"Out[34]=",ExpressionUUID->"fbfc200a-9125-4d63-9909-6d43ad0d9021"]
++}, Open  ]],
++
++Cell[CellGroupData[{
++
++Cell[BoxData[{
++ RowBox[{
++  RowBox[{"product", "=", 
++   RowBox[{"p14", "+", "p23", "+", "p32", "+", "p41"}]}], 
++  ";"}], "\[IndentingNewLine]", 
++ RowBox[{"Expand", "[", 
++  RowBox[{"product", "*", "product"}], "]"}]}], "Input",
++ CellChangeTimes->{{3.908116313623146*^9, 3.90811642304885*^9}},
++ CellLabel->"In[44]:=",ExpressionUUID->"adaaa1f0-720c-4da2-9bc6-e74e607d163e"],
++
++Cell[BoxData[
++ RowBox[{
++  SuperscriptBox["p14", "2"], "+", 
++  RowBox[{"2", " ", "p14", " ", "p23"}], "+", 
++  SuperscriptBox["p23", "2"], "+", 
++  RowBox[{"2", " ", "p14", " ", "p32"}], "+", 
++  RowBox[{"2", " ", "p23", " ", "p32"}], "+", 
++  SuperscriptBox["p32", "2"], "+", 
++  RowBox[{"2", " ", "p14", " ", "p41"}], "+", 
++  RowBox[{"2", " ", "p23", " ", "p41"}], "+", 
++  RowBox[{"2", " ", "p32", " ", "p41"}], "+", 
++  SuperscriptBox["p41", "2"]}]], "Output",
++ CellChangeTimes->{{3.9081163735872583`*^9, 3.908116423986018*^9}},
++ CellLabel->"Out[45]=",ExpressionUUID->"c3d4450d-80b3-4718-ab76-35a3eaf77dc8"]
++}, Open  ]],
++
++Cell[BoxData[
++ RowBox[{"(", 
++  RowBox[{"phidag", ".", "Ay", ".", "phi"}], ")"}]], "Input",
++ CellChangeTimes->{3.9081171284025803`*^9},
++ CellLabel->"In[46]:=",ExpressionUUID->"1d8351f7-3321-46ff-9377-4c8cd645048c"],
++
++Cell[BoxData[
++ RowBox[{
++  RowBox[{"producty", "=", 
++   RowBox[{
++    RowBox[{
++     RowBox[{"-", "\[ImaginaryI]"}], "*", " ", "p14"}], "-", 
++    RowBox[{"\[ImaginaryI]", " ", "*", "p23"}], "+", 
++    RowBox[{"\[ImaginaryI]", " ", "*", "p32"}], "+", 
++    RowBox[{"\[ImaginaryI]", " ", "*", "p41"}]}]}], ";"}]], "Input",
++ CellChangeTimes->{{3.908117136248444*^9, 3.908117170242757*^9}},
++ CellLabel->"In[47]:=",ExpressionUUID->"a6a78cac-7e5e-4dbf-bb61-cc6e0186b8a4"],
++
++Cell[CellGroupData[{
++
++Cell[BoxData[
++ RowBox[{"Expand", "[", 
++  RowBox[{"producty", "*", "producty"}], "]"}]], "Input",
++ CellChangeTimes->{{3.908117175714093*^9, 3.908117176931246*^9}},
++ CellLabel->"In[48]:=",ExpressionUUID->"4e375aca-6281-4084-87b3-d1824017ca7e"],
++
++Cell[BoxData[
++ RowBox[{
++  RowBox[{"-", 
++   SuperscriptBox["p14", "2"]}], "-", 
++  RowBox[{"2", " ", "p14", " ", "p23"}], "-", 
++  SuperscriptBox["p23", "2"], "+", 
++  RowBox[{"2", " ", "p14", " ", "p32"}], "+", 
++  RowBox[{"2", " ", "p23", " ", "p32"}], "-", 
++  SuperscriptBox["p32", "2"], "+", 
++  RowBox[{"2", " ", "p14", " ", "p41"}], "+", 
++  RowBox[{"2", " ", "p23", " ", "p41"}], "-", 
++  RowBox[{"2", " ", "p32", " ", "p41"}], "-", 
++  SuperscriptBox["p41", "2"]}]], "Output",
++ CellChangeTimes->{3.908117177458246*^9},
++ CellLabel->"Out[48]=",ExpressionUUID->"54712442-ad57-4b43-ad31-16b371b77f2c"]
++}, Open  ]]
++},
++WindowSize->{1920, 1029},
++WindowMargins->{{0, Automatic}, {0, Automatic}},
++PrivateNotebookOptions->{"VersionedStylesheet"->{"Default.nb"[8.] -> False}},
++Magnification:>1.3 Inherited,
++FrontEndVersion->"13.1 for Linux x86 (64-bit) (June 16, 2022)",
++StyleDefinitions->"Default.nb",
++ExpressionUUID->"55e26c85-2d1c-46a3-80c9-300734861b76"
++]
++(* End of Notebook Content *)
++
++(* Internal cache information *)
++(*CellTagsOutline
++CellTagsIndex->{}
++*)
++(*CellTagsIndex
++CellTagsIndex->{}
++*)
++(*NotebookFileOutline
++Notebook[{
++Cell[545, 20, 194, 3, 75, "Text",ExpressionUUID->"78daf23f-fa74-48e7-a3e4-e50f3639f323"],
++Cell[CellGroupData[{
++Cell[764, 27, 3495, 87, 383, "Input",ExpressionUUID->"9df1f9c4-0ac1-4cdb-9c0d-a6a3e12a087c"],
++Cell[4262, 116, 1432, 20, 43, "Output",ExpressionUUID->"9bf9a792-42f6-4892-b372-0177fe65c6b6"]
++}, Open  ]],
++Cell[5709, 139, 239, 4, 75, "Text",ExpressionUUID->"2b279165-2d18-4747-917b-024bbce41960"],
++Cell[5951, 145, 1473, 47, 170, "Input",ExpressionUUID->"34883b3c-11c6-4f2c-9a3d-6c0d72344bc0"],
++Cell[7427, 194, 439, 12, 65, "Input",ExpressionUUID->"5023ce70-d61f-436a-bb8d-e31de49b7bc2"],
++Cell[CellGroupData[{
++Cell[7891, 210, 288, 5, 37, "Input",ExpressionUUID->"dca8909e-3ce3-4025-9480-bbad5cbb9d24"],
++Cell[8182, 217, 341, 8, 46, "Output",ExpressionUUID->"fbfc200a-9125-4d63-9909-6d43ad0d9021"]
++}, Open  ]],
++Cell[CellGroupData[{
++Cell[8560, 230, 369, 8, 65, "Input",ExpressionUUID->"adaaa1f0-720c-4da2-9bc6-e74e607d163e"],
++Cell[8932, 240, 603, 13, 46, "Output",ExpressionUUID->"c3d4450d-80b3-4718-ab76-35a3eaf77dc8"]
++}, Open  ]],
++Cell[9550, 256, 213, 4, 37, "Input",ExpressionUUID->"1d8351f7-3321-46ff-9377-4c8cd645048c"],
++Cell[9766, 262, 460, 10, 40, InheritFromParent,ExpressionUUID->"a6a78cac-7e5e-4dbf-bb61-cc6e0186b8a4"],
++Cell[CellGroupData[{
++Cell[10251, 276, 241, 4, 37, "Input",ExpressionUUID->"4e375aca-6281-4084-87b3-d1824017ca7e"],
++Cell[10495, 282, 596, 14, 65, "Output",ExpressionUUID->"54712442-ad57-4b43-ad31-16b371b77f2c"]
++}, Open  ]]
++}
++]
++*)
++
+diff --git a/testutils/get_occupations.py b/testutils/get_occupations.py
+new file mode 100644
+index 00000000..bf298dea
+--- /dev/null
++++ b/testutils/get_occupations.py
+@@ -0,0 +1,69 @@
++#!/usr/bin/env python3
++# imports
++import h5py as hdf5
++import numpy as np
++import scipy.integrate as integrate
++import os
++import glob
++import itertools
++import sys
++### here we need to add the path to the w2dynamics main directory
++#auxdir="$HOME/opt/w2dynamics/lib/python3.*/site-packages/w2dyn"
++try:
++    auxdir="/home/hpc/b158cb/b158cb10/opt/w2dynamics/lib/python3.9/site-packages/w2dyn"
++except:
++    auxdir="/home/lorenzo/opt/w2dynamics/lib/python3.10/site-packages/w2dyn"
++sys.path.insert(0,auxdir)
++### in order to import the functions available in input.py
++import auxiliaries.input as io
++import auxiliaries.compound_index as indexobject
++
++### load hamiltonian; spin_orbit=True, because the Hamiltonian
++### we read, is spin-dependent
++
++N_f = 4
++N_c = 8
++N_orb = N_f+N_c
++N_spin = 2
++u1 = 57.95
++w_term = 47.12 
++v_term = 48.33 
++hfshift = -3.5*u1
++which_iter='last'
++
++f=hdf5.File(sys.argv[1],"r")
++try:
++    which_iter = sys.argv[2]
++except:
++    which_iter = 'last'
++
++
++if which_iter == 'all':
++    Listiter=list(f.keys())[4:-3]
++else:
++    Listiter=[list(f.keys())[-4]]
++
++for Niter in Listiter:
++    xmu = f[Niter+'/mu/value'][()]
++    gdensold=np.zeros(shape=(N_orb,N_spin,N_orb,N_spin),dtype=complex)
++    f_occ=np.zeros(shape=(N_f,N_spin,N_f,N_spin),dtype=complex)
++
++    f_occ = f[Niter+"/ineq-001/occ/value"]
++    gdensold = f[Niter+"/gdensold/value"]
++
++    nuf=0.0
++    nuf_occ=0.0
++    nuc_type1=0.0
++    nuc_type2=0.0
++
++    for i in range(4):
++        nuf = nuf + gdensold[i,0,i,0] + gdensold[i,1,i,1]
++        nuf_occ = nuf_occ + f_occ[i,0,i,0] + f_occ[i,1,i,1]
++    for i in [4,5,8,9]:
++        nuc_type1 = nuc_type1 + gdensold[i,0,i,0] + gdensold[i,1,i,1]
++    for i in [6,7,10,11]:
++        nuc_type2 = nuc_type2 + gdensold[i,0,i,0] + gdensold[i,1,i,1]
++
++    real_xmu=np.real(xmu) + w_term*(np.real(nuf_occ)-4) + v_term*(np.real(nuc_type1+nuc_type2)-8)
++    print(np.real(xmu),real_xmu,np.real(nuf_occ),np.real(nuc_type1),np.real(nuc_type2),np.real(nuf_occ)+np.real(nuc_type1)+np.real(nuc_type2))
++
+diff --git a/testutils/mu_dc_converter.py b/testutils/mu_dc_converter.py
+new file mode 100644
+index 00000000..3035acae
+--- /dev/null
++++ b/testutils/mu_dc_converter.py
+@@ -0,0 +1,62 @@
++#!/usr/bin/env python
++
++import numpy as np
++import os,sys
++import h5py as hdf5
++import re
++
++try:
++    file=sys.argv[1]
++    what=sys.argv[2]
++except:
++    print("Usage: mu_dc_converter.py #FILE #mu/dc (optional Wterm Vterm)")
++
++try:
++    w_term=sys.argv[3]
++    v_term=sys.argv[4]
++except:
++    w_term=47.12
++    v_term=48.33
++    
++f = hdf5.File(file, 'r')
++regex_dmft=re.compile(".*dmft")
++iters = list(filter(regex_dmft.match, f))
++if len(iters)==0:
++    regex_stat=re.compile(".*stat")
++    iters = list(filter(regex_stat.match, f))
++    niter=iters[-2]
++else:
++    niter=iters[-3]
++
++
++xmu = f[str(niter)+'/mu/value'][()]
++dc=f[niter+"/ineq-001/dc/value"][()]
++f_occ = f[niter+"/ineq-001/occ/value"][()]
++gdensold = f[niter+"/gdensold/value"][()]
++
++nuf=0.0
++nuf_occ=0.0
++nuc_type1=0.0
++nuc_type2=0.0
++
++for i in range(4):
++    nuf_occ = nuf_occ + f_occ[i,0,i,0] + f_occ[i,1,i,1]
++for i in [4,5,8,9]:
++    nuc_type1 = nuc_type1 + gdensold[i,0,i,0] + gdensold[i,1,i,1]
++for i in [6,7,10,11]:
++    nuc_type2 = nuc_type2 + gdensold[i,0,i,0] + gdensold[i,1,i,1]
++
++shuffle = w_term*(np.real(nuf_occ)-4) + v_term*(np.real(nuc_type1+nuc_type2)-8)
++
++if what=="mu":
++    shifted_mu = np.real(xmu) + shuffle
++    print(shifted_mu)
++if what=="dc":
++    shifted_dc=np.zeros(12)
++    for i in range(0,4):
++        shifted_dc[i] = dc[i,0] + shuffle
++    for i in range(4,12):
++        shifted_dc[i] = shuffle
++    print(*shifted_dc, sep=", ")
++
++
+diff --git a/testutils/phonons/elements.gp b/testutils/phonons/elements.gp
+new file mode 100644
+index 00000000..f234adce
+--- /dev/null
++++ b/testutils/phonons/elements.gp
+@@ -0,0 +1,28 @@
++set term pngcairo size 800,800
++set out "colormatrix.png"
++set yrange [:] reverse
++set palette rgbformula 2,-7,-7
++set logscale cb
++set size square
++unset colorbox
++set autoscale fix
++set tics scale 0
++unset cbtics
++set cblabel 'Score'
++set xtics format ""
++
++set arrow 1 from 0.5,4.5 to 12.5,4.5 nohead front
++set arrow 2 from 4.5,0.5 to 4.5,12.5 nohead front
++
++set arrow 3 from 2.5,0.5 to 2.5,4.5 nohead front dt 2
++set arrow 4 from 0.5,2.5 to 4.5,2.5 nohead front dt 2
++
++
++set arrow 5 from 8.5,0.5 to 8.5,12.5 nohead front dt 2
++set arrow 6 from 0.5,8.5 to 12.5,8.5 nohead front dt 2
++
++set x2tics (1,2,3,4,5,6,7,8,9,10,11,12)
++set ytics (1,2,3,4,5,6,7,8,9,10,11,12)
++unset key
++plot 'elements.dat' u ($1+1):($2+1):(abs($3)) matrix with image,\
++     '' matrix using ($1+1):($2+1):(sprintf('%.2f', $3)) with labels font ',11'
+diff --git a/testutils/phonons/phonons_test.py b/testutils/phonons/phonons_test.py
+new file mode 100644
+index 00000000..a91c3f0d
+--- /dev/null
++++ b/testutils/phonons/phonons_test.py
+@@ -0,0 +1,141 @@
++#!/usr/bin/env python3
++
++import numpy as np
++import os,sys
++sys.path.insert(0,"../../")
++import w2dyn.dmft.mf_phonons as phonons
++
++densities=np.ones([12,2,12,2])
++tmp_dc_full=np.zeros([12,2,12,2])*1j
++
++a11=1.0
++a22=1.0
++beta=1.0
++ll=1.0
++
++def orbvalley_index(orbindex,valleyindex,elec_type):
++    if elec_type=="f":
++        Norb=2
++    if elec_type=="c":
++        Norb=4
++    orbvalley = 4*(elec_type=="c") + Norb * valleyindex + orbindex
++    return orbvalley
++
++ph=phonons.phonon_1bo_params(a11,beta)
++
++# f+f terms without density (coming from anticommutators in u_matrix), x and y
++for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
++    firstop=phonons.onebody_op("f",phononterm[0])
++    firstop.create_1bo()
++    secondop=phonons.onebody_op("f",phononterm[1])
++    secondop.create_1bo()
++    twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll*a22**2)
++    twobodyterm.create_2bo()
++    twobodyterm.normalorder()
++    twobodyterm.decouple()
++    dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++    for iterm in range(len(dc_coeff_array)):
++        if dc_dens_array[iterm][0]=="NODENS":
++            # orb1 val1 spin1 type1 orb2 val2 spin2 type2
++            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++            
++# f+c terms, x and y
++for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
++    firstop=phonons.onebody_op("f",phononterm[0])
++    firstop.create_1bo()
++    secondop=phonons.onebody_op("c",phononterm[1])
++    secondop.create_1bo()
++    twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll*a22)
++    twobodyterm.create_2bo()
++    twobodyterm.normalorder()
++    twobodyterm.decouple()
++    dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++    for iterm in range(len(dc_coeff_array)):
++        if dc_dens_array[iterm][0]=="NODENS":
++            # orb1 val1 spin1 type1 orb2 val2 spin2 type2
++            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++        else:
++            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++            
++            dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
++            dens_ispin  = dc_dens_array[iterm][2]
++            dens_jindex = orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
++            dens_jspin  = dc_dens_array[iterm][6]
++            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
++                
++# c+c terms, x and y
++for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
++    firstop=phonons.onebody_op("c",phononterm[0])
++    firstop.create_1bo()
++    secondop=phonons.onebody_op("c",phononterm[1])
++    secondop.create_1bo()
++    twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll)
++    twobodyterm.create_2bo()
++    twobodyterm.normalorder()
++    twobodyterm.decouple()
++    dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++    for iterm in range(len(dc_coeff_array)):
++        if dc_dens_array[iterm][0]=="NODENS":
++            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++        else:
++            iindex = orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++            
++            dens_iindex = orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
++            dens_ispin  = dc_op_array[iterm][2]
++            dens_jindex = orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
++            dens_jspin  = dc_op_array[iterm][6]
++            
++            tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
++   
++tmp_dc_full_bak=np.copy(tmp_dc_full[:,0,:,0])   
++   
++print("iband jband ispin jspin element")
++
++for iband in range(12):
++    for jband in range(12):
++        for ispin in range(2):
++            for jspin in range(2):
++                if ispin == 0:
++                    ispin_="↑"
++                else:
++                    ispin_="↓"
++                if jspin == 0:
++                    jspin_="↑"
++                else:
++                    jspin_="↓"
++                print(iband,jband,ispin_,jspin_,tmp_dc_full[iband,ispin,jband,jspin])
++
++
++
++
++if False:
++
++    firstop=phonons.onebody_op("f",ph.VfX)
++    firstop.create_1bo()
++    secondop=phonons.onebody_op("f",ph.VfX)
++    secondop.create_1bo()
++    twobodyterm=phonons.twobody_op(firstop,secondop,-1*ll)
++    twobodyterm.create_2bo()
++    twobodyterm.normalorder()
++    twobodyterm.prettyprint()
++    twobodyterm.decouple()
++    print(np.imag(ph.VcY))
++    #twobodyterm.prettyprint_decoupled()
+diff --git a/testutils/template_parameters.in b/testutils/template_parameters.in
+new file mode 100644
+index 00000000..9402ed34
+--- /dev/null
++++ b/testutils/template_parameters.in
+@@ -0,0 +1,56 @@
++#Parameters.in
++[General]
++DOS = ReadIn
++HkFile = ../hk_weighted_2valleys.dat
++beta = 1.000000
++NAt = 1
++magnetism = para
++totdens = 11.000000
++EPSN = 0.000001
++DMFTsteps = 80
++FileNamePrefix = dmft_blg
++fileold = almost_converged_2.hdf5
++readold = -1 
++#mu_search = kappa
++mixing = 0.5
++mu_mixing = 0.5
++dc_mixing_strategy = linear
++dc_mixing = 0.5
++dc_subblock = 4
++dc_subblock_step = 2
++dc_rest_step = 2
++
++EPSEQ=0.001
++dc = Wterm
++Wterm_U2	= 2.329
++Wterm_W         = 44.03,44.03,50.20,50.20
++Wterm_V         = 48.33
++Wterm_J         = 0.0
++Wterm_shifts    = -202.825, 0
++Wterm_ll        = 0.0
++Wterm_a22       = 0.0
++Wterm_a11       = 0.0
++Wterm_beta      = 0.0
++WriteFullLattice = 1
++
++[Atoms]
++[[1]]
++QuantumNumbers = Nt Szt All
++Hamiltonian = ReadUmatrix
++umatrix = u_matrix.dat
++Nd = 4
++Np = 8
++
++[QMC]
++Nwarmups = 200000
++Nmeas = 150000
++NCorr = 1500
++Niw = 2025
++Nftau = 1000
++Ntau = 500
++NLegMax = 40
++NLegOrder = 40
++TaudiffMax = 1.000000
++offdiag=0
++Percentage4OperatorMove=0.02
++MeasSusz=1
+diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
+index 2010cbe2..58ab0081 100644
+--- a/w2dyn/auxiliaries/config.py
++++ b/w2dyn/auxiliaries/config.py
+@@ -378,6 +378,18 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
+         return doublecounting.SigZeroBar(ineq_list, lda_dens, atom_list, u_full)
+     elif dc_type == 'trace':
+         return doublecounting.Trace(ineq_list, lda_dens, atom_list, u_full)
++    elif dc_type == 'Wterm':
++        return doublecounting.Wterm(np.array(cfg["General"]["Wterm_U2"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_W"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_V"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_J"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_ll"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_a22"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_a11"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_beta"],dtype=np.double),
++                                    np.array(cfg["General"]["Wterm_shifts"],dtype=np.double),
++                                    cfg["General"]["Wterm_rotationmatrix"],
++                                    ineq_list, lda_dens, atom_list, u_full)
+     else:
+         raise NotImplemented("Unknown double counting scheme")
+ 
+diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
+index c3441591..023df8e4 100644
+--- a/w2dyn/auxiliaries/configspec
++++ b/w2dyn/auxiliaries/configspec
+@@ -303,11 +303,27 @@ mu_mixing       = float(default=0.0)            # mix in old chemical potential
+ half-bandwidth  = force_list(default=2.)        # half-bandwidth of the DOS
+ # additional values for LDA+DMFT calculations
+ NAt             = integer(default=1)
+-dc              = option_or_list('anisimov','fll','amf','trace','siginfbar','sigzerobar',default='anisimov')
++dc              = option_or_list('anisimov','fll','Wterm','amf','trace','siginfbar','sigzerobar',default='anisimov')
+ dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
++dc_mixing_strategy = option('linear','diis', default='linear')	 	# mixing between old and new SE
++dc_subblock     = integer(default=4)            # the d subblock
++dc_subblock_step = integer(default=1)            # every # the d-block is mixed
++dc_rest_step = integer(default=5)            # every # the rest is mixed
+ dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
+ dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals
+ siw_moments     = option('estimate', 'extract', default='estimate')
++sigma_kick      = float(default=0.0)            # kick in self-energy
++sigma_kick_persist = integer(default=1)         # for how long should I keep the kick
++Wterm_U2                = float(default=0.0)
++Wterm_W                 = force_list(default=None)
++Wterm_V                 = float(default=0.0)
++Wterm_J                 = float(default=0.0)
++Wterm_shifts            = force_list(default=None)
++Wterm_rotationmatrix    = string(default=None) 
++Wterm_ll        = float(default=0.0)
++Wterm_a22       = float(default=0.0)
++Wterm_a11       = float(default=0.0)
++Wterm_beta      = float(default=0.0)
+ Neps            = integer(default=1000)         # numerical integration of DOS
+ 
+ # fix mu parameters
+diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
+index 94059d71..514936d8 100644
+--- a/w2dyn/dmft/doublecounting.py
++++ b/w2dyn/dmft/doublecounting.py
+@@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
+ import numpy as np
+ import w2dyn.dmft.orbspin as orbspin
+ import w2dyn.dmft.atoms as atoms
++import sys
++import w2dyn.dmft.mf_phonons as phonons
++import pickle
+ # import w2dyn.dmft.lattice as lattice
+ # import w2dyn.auxiliaries.transform as tf
+ 
+@@ -223,6 +226,332 @@ class SelfConsistent(DoubleCounting):
+         self.d_dens_sum = np.array([densities[sl].sum() for sl in self.d_slices])
+         self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
+         self.self_cons = True
++        
++class Wterm(SelfConsistent):
++    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, rotationmatrix, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.sav = ShellAveraged(self.shell_av['densities'],
++                                 self.shell_av['atom_list'],
++                                 self.shell_av['u_full'])
++        self.u2 = u2
++        self.w = w
++        self.v = v
++        self.jj = j
++        self.shifts = shifts
++        self.ll = ll
++        self.a22 = a22
++        self.a11 = a11
++        self.beta = beta
++        if rotationmatrix is not None:
++            try:
++                with open(rotationmatrix, "rb") as f:
++                    rotmat = pickle.load(f)
++                    self.rotationmatrix = np.kron(np.eye(2), rotmat)
++                print("Read rotation matrix from "+rotationmatrix)
++            except:
++                print("No valid rotation matrix provided!")
++                sys.exit()
++        else:
++            print("Setting rotation matrix to identity")
++            self.rotationmatrix = np.eye(24)
++
++    def rotate_to_bandbasis(self, mat):
++        mat_t = mat.transpose(1, 0, 3, 2)
++        mat_t = mat_t.reshape(24,24)
++
++        mat_t = np.dot(np.linalg.inv(self.rotationmatrix),np.matmul(mat_t,self.rotationmatrix))
++
++        mat_t = mat_t.reshape(2, 12, 2, 12)
++        mat_t = mat_t.transpose(1, 0, 3, 2)
++        return mat_t
++        
++    def rotate_to_orbbasis(self, mat):
++        mat_t = mat.transpose(1, 0, 3, 2)
++        mat_t = mat_t.reshape(24,24)
++
++        mat_t = np.dot(self.rotationmatrix,np.matmul(mat_t,np.linalg.inv(self.rotationmatrix)))
++
++        mat_t = mat_t.reshape(2, 12, 2, 12)
++        mat_t = mat_t.transpose(1, 0, 3, 2)
++        return mat_t
++    
++    def orbvalley_index_j(self,orbindex,valleyindex,elec_type):
++        if elec_type=="f":
++            orbvalley= 2 * valleyindex + orbindex
++        if elec_type=="c":
++            orbvalley= 4 + 4 * valleyindex + orbindex + 2
++        return orbvalley
++        
++    def orbvalley_index(self,orbindex,valleyindex,elec_type):
++        if elec_type=="f":
++            Norb=2
++        if elec_type=="c":
++            Norb=4
++        orbvalley = 4*(elec_type=="c") + Norb * valleyindex + orbindex
++        return orbvalley
++        
++
++    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
++        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
++            #sys.exit("Fix, we need a proper density matrix")
++            densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
++            for iorb in range(12):
++                for ispin in range(2):
++                    densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
++
++        #rotate to orbital basis: this DC works in the original basis!
++
++        densities = self.rotate_to_orbbasis(densities)
++
++        #densities = np.real(densities)
++        diagonal_densities = orbspin.extract_diagonal(densities)
++        shifts = np.array(self.shifts)
++        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins),dtype=complex)
++        
++        #################
++        # Hartree shift #
++        #################
++        
++        for ispin in range(2):
++            for iorb in range(0,4):
++                tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[0]
++            for iorb in range(4,12):
++                tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[1]
++                
++        #################        
++        # U2 terms #
++        #################
++                    
++        for ispin in range(2):
++            for iorb_f in range(4):
++                tmp_dc_full[iorb_f,ispin,iorb_f,ispin] +=  6.0 * self.u2 * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
++        
++        #################        
++        # W and V terms #
++        #################
++                
++        #W term 1 (S284)
++        for ispin in range(2):
++            for ival_c in range(2):
++                for iorb_c in range(4):
++                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
++                    tmp_dc_full[index_c,ispin,index_c,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
++
++        #W term 2 (S284)
++        for ispin in range(2):
++            for iorb_f in range(4):
++                for val_c in range(2):
++                    for iorb_c in range(4):
++                        index_c = self.orbvalley_index(iorb_c,ival_c,"c")
++                        tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
++
++        #W term 3 (S284) This is the Fock term, which for now we don't consider
++        if True:
++            for ispin in range(2):
++                for jspin in range(2):
++                    for iorb_f in range(4):
++                        for ival_c in range(2):
++                            for iorb_c in range(4):
++                                index_c = self.orbvalley_index(iorb_c,ival_c,"c")
++                                tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
++                                tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
++
++        
++        #V term (S292)
++        for ispin in range(2):
++            for iorb_c in range(4,12):
++                tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
++                    
++        ##########
++        # J term # 
++        ##########
++        
++        #(S288) of the PRL
++        
++        #Here we try in the way we wrote it in the PRX supplementary or equivalently Haoyu's PRL
++        Jmatrix = np.zeros_like(tmp_dc_full)
++        
++        #First term of S16
++        for iorb in range(2):
++            for jorb in range(2):
++                for ival in range(2):
++                    for jval in range(2):
++                        for ispin in range(2):
++                            for jspin in range(2):
++                                ival_sign = (-1)**ival #valley 1 is plus valley, valley 2 is minus valley
++                                jval_sign = (-1)**jval
++                                prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) ) #+1 because python indexes start from 0, but it makes no difference
++                                
++                                i_f = self.orbvalley_index_j(iorb,ival,"f")
++                                j_f = self.orbvalley_index_j(jorb,jval,"f")
++                                i_c = self.orbvalley_index_j(iorb,ival,"c")
++                                j_c = self.orbvalley_index_j(jorb,jval,"c")
++                                                                    
++                                Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
++
++        #Second term of S16
++        for iorb in range(2):
++            for jorb in range(2):
++                for ival in range(2):
++                    for jval in range(2):
++                        for ispin in range(2):
++                            for jspin in range(2):
++                                ival_sign = (-1)**ival
++                                jval_sign = (-1)**jval
++                                prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) )
++                                
++                                i_f = self.orbvalley_index_j(iorb,ival,"f")
++                                j_f = self.orbvalley_index_j(jorb,jval,"f")
++                                i_c = self.orbvalley_index_j(iorb,ival,"c")
++                                j_c = self.orbvalley_index_j(jorb,jval,"c")
++                                
++                                Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
++
++        #########################################
++        ## THE FOCK TERM                       ##
++        #########################################
++        
++        #Fock term from (S290) Song-Bernevig
++        for iorb in range(2):
++            for jorb in range(2):
++                for ival in range(2):
++                    for jval in range(2):
++                        for ispin in range(2):
++                            for jspin in range(2):
++                                sign_ival = (-1) ** ival
++                                sign_jval = (-1) ** jval
++                                deltaval = sign_ival * sign_jval  + (-1)**(iorb + 1 + jorb + 1)
++                                i_f = self.orbvalley_index_j(iorb,ival,"f")
++                                i_c = self.orbvalley_index_j(iorb,ival,"c")
++                                j_f = self.orbvalley_index_j(jorb,jval,"f")
++                                j_c = self.orbvalley_index_j(jorb,jval,"c")
++                                Jmatrix[i_f,ispin,i_c,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
++                                Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
++        print("Fock term from S290")
++        
++        #Sum the J matrix to the DC
++        print("Summing J term")
++        tmp_dc_full += Jmatrix
++            
++        ################################
++        # Phonons mean-field decoupled #
++        ################################
++        
++        ph=phonons.phonon_1bo_params(self.a11,self.beta)
++        
++        # f+f terms without density (coming from anticommutators in u_matrix), x and y
++        for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
++            firstop=phonons.onebody_op("f",phononterm[0])
++            firstop.create_1bo()
++            secondop=phonons.onebody_op("f",phononterm[1])
++            secondop.create_1bo()
++            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22**2)
++            twobodyterm.create_2bo()
++            twobodyterm.normalorder()
++            twobodyterm.decouple()
++            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++            for iterm in range(len(dc_coeff_array)):
++                if dc_dens_array[iterm][0]=="NODENS":
++                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
++                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++                    ispin  = dc_op_array[iterm][2]
++                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++                    jspin  = dc_op_array[iterm][6]
++                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++                    
++        # f+c terms, x and y
++        for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
++            firstop=phonons.onebody_op("f",phononterm[0])
++            firstop.create_1bo()
++            secondop=phonons.onebody_op("c",phononterm[1])
++            secondop.create_1bo()
++            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22)
++            twobodyterm.create_2bo()
++            twobodyterm.normalorder()
++            twobodyterm.decouple()
++            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++            for iterm in range(len(dc_coeff_array)):
++                if dc_dens_array[iterm][0]=="NODENS":
++                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
++                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++                    ispin  = dc_op_array[iterm][2]
++                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++                    jspin  = dc_op_array[iterm][6]
++                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++                else:
++                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++                    ispin  = dc_op_array[iterm][2]
++                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++                    jspin  = dc_op_array[iterm][6]
++                    
++                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
++                    dens_ispin  = dc_dens_array[iterm][2]
++                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
++                    dens_jspin  = dc_dens_array[iterm][6]
++                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
++                        
++        # c+c terms, x and y
++        for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
++            firstop=phonons.onebody_op("c",phononterm[0])
++            firstop.create_1bo()
++            secondop=phonons.onebody_op("c",phononterm[1])
++            secondop.create_1bo()
++            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll)
++            twobodyterm.create_2bo()
++            twobodyterm.normalorder()
++            twobodyterm.decouple()
++            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
++            for iterm in range(len(dc_coeff_array)):
++                if dc_dens_array[iterm][0]=="NODENS":
++                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++                    ispin  = dc_op_array[iterm][2]
++                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++                    jspin  = dc_op_array[iterm][6]
++                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
++                else:
++                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
++                    ispin  = dc_op_array[iterm][2]
++                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
++                    jspin  = dc_op_array[iterm][6]
++                    
++                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
++                    dens_ispin  = dc_op_array[iterm][2]
++                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
++                    dens_jspin  = dc_op_array[iterm][6]
++                    
++                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
++        
++        
++        ######################
++        # Sum all and return #
++        ######################
++        
++        #rotate the DC to the band basis! this is where we do the calculations
++        print("      ")
++        print("Before rotation:")
++        for row in tmp_dc_full[:,0,:,0]:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++        print("      ")
++
++        tmp_dc_full = self.rotate_to_bandbasis(tmp_dc_full)
++       
++        print("      ")
++        print("After rotation:")
++        for row in tmp_dc_full[:,0,:,0]:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++        print("      ")
++
++       
++        #set numerically small elements to 0
++        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
++        
++        self.dc_value = tmp_dc_full
++
++        #here there was a self.sav.from_shell: this promoted the dc array to the diagonal of a matrix, with a minus sign. Then there was another minus sign
++        #when assigning the return value of this function. We create directly the matrix, so we don't need to add the minus sign to compensate the one coming
++        #from sav.from_shell
++        #print("DIAGONAL DC = ",orbspin.extract_diagonal(self.dc_value)[:,0])
++        return self.dc_value
+ 
+ class SigZeroBar(SelfConsistent):
+     def get(self, siws=None, smoms=None, giws = None, occs = None):
+diff --git a/w2dyn/dmft/mf_phonons.py b/w2dyn/dmft/mf_phonons.py
+new file mode 100644
+index 00000000..3ae93414
+--- /dev/null
++++ b/w2dyn/dmft/mf_phonons.py
+@@ -0,0 +1,303 @@
++import os,sys
++import numpy as np
++
++class phonon_1bo_params:
++    def __init__(self,alpha,beta):
++        self.alpha=alpha
++        self.beta=beta
++        
++        #orbital
++        self.sigma_0 = np.array([[1.0,0.0],[0.0,1.0]])
++        self.sigma_x = np.array([[0.0,1.0],[1.0,0.0]])
++        self.sigma_y = np.array([[0.0,-1j],[1j,0.0]])
++        self.sigma_z = np.array([[1.0,0.0],[0.0,-1.0]])
++        
++        #valley
++        self.tau_0 = np.array([[1.0,0.0],[0.0,1.0]])
++        self.tau_x = np.array([[0.0,1.0],[1.0,0.0]])
++        self.tau_y = np.array([[0.0,-1j],[1j,0.0]])
++        self.tau_z = np.array([[1.0,0.0],[0.0,-1.0]])
++
++        #spin
++        self.s_0 = np.array([[1.0,0.0],[0.0,1.0]])
++        self.s_x = np.array([[0.0,1.0],[1.0,0.0]])
++        self.s_y = np.array([[0.0,-1j],[1j,0.0]])
++        self.s_z = np.array([[1.0,0.0],[0.0,-1.0]])
++
++        self.reprMat = np.array([[self.alpha,0.0],[0.0,self.beta]])
++
++        self.VfX = np.kron(self.s_0, np.kron(self.tau_x, self.sigma_x))
++        self.VfY = np.kron(self.s_0, np.kron(self.tau_y, self.sigma_x))
++        self.VcX = np.kron(self.s_0, np.kron(self.tau_x, np.kron(self.reprMat, self.sigma_x)))
++        self.VcY = np.kron(self.s_0, np.kron(self.tau_y, np.kron(self.reprMat, self.sigma_x)))
++
++class State:                   
++    def __init__(self, dagger, elec_type, elec_valley, elec_orb, elec_spin):
++        self.dagger = dagger
++        self.elec_valley = elec_valley + 1
++        self.elec_orb    = elec_orb + 1
++        self.elec_spin   = elec_spin + 1
++        self.elec_type   = elec_type
++
++class onebody_op:
++    def __init__(self,elec_type,coeff_matrix):
++        self.elec_type = elec_type
++        self.op_array = []
++        self.op_dagger_array = []
++        self.coeff_matrix = coeff_matrix
++        self.op_terms = []
++        if self.elec_type == "f":
++            for ispin in range(2):
++                for ival in range(2):
++                    for iorb in range(2):
++                        self.op_array.append(State(False,"f",ival,iorb,ispin))
++                        self.op_dagger_array.append(State(True,"f",ival,iorb,ispin))
++        else:
++            for ispin in range(2):
++                for ival in range(2):
++                    for iorb in range(4):
++                        self.op_array.append(State(False,"c",ival,iorb,ispin))
++                        self.op_dagger_array.append(State(True,"c",ival,iorb,ispin))
++
++        
++    def create_1bo(self):
++        op_terms=[]
++        for ii in range(len(self.op_dagger_array)):
++            for jj in range(len(self.op_array)):
++                if self.coeff_matrix[ii][jj] != 0:
++                    op_terms.append([self.coeff_matrix[ii][jj],self.op_dagger_array[ii],self.op_array[jj]])
++        self.op_terms = op_terms
++        
++    def prettyprint(self):
++        for iterm in range(len(self.op_terms)):
++            term=self.op_terms[iterm]
++            coeff=term[0]
++            op_1=term[1]
++            op_2=term[2]
++            if op_1.dagger==True:
++                suffix1="dg"
++            else:
++                suffix1=""
++            if op_2.dagger==True:
++                suffix2="dg"
++            else:
++                suffix2=""
++            print(str(coeff) +"  "+ op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
++                                  + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
++
++class twobody_op:
++    def __init__(self,op_1,op_2,coeff):
++        self.coeff = coeff
++        self.op_1 = op_1
++        self.op_2 = op_2
++        self.op_terms = []
++        self.mf_decoupled = []
++        self.NO_FLAG = False
++    
++    def create_2bo(self):
++        op_terms=[]
++        for ii in range(len(self.op_1.op_terms)):
++            firstop = self.op_1.op_terms[ii]
++            for jj in range(len(self.op_2.op_terms)):
++                secondop = self.op_2.op_terms[jj]
++                overall_coeff = self.coeff * firstop[0]*secondop[0]
++                if overall_coeff != 0:
++                    op_terms.append([overall_coeff,firstop[1],firstop[2],secondop[1],secondop[2]])
++        self.op_terms = op_terms
++        
++    def normalorder(self):
++        dummylist=[]
++        for iterm in range(len(self.op_terms)):
++            term=self.op_terms[iterm]
++           
++            #save components of the term
++            coeff=term[0]
++            a=term[1]
++            b=term[2]
++            c=term[3]
++            d=term[4]
++            if (b.dagger == False) and (c.dagger == True):
++                pass
++            else:
++                print("Either already NO or something wrong")
++                return
++            
++            #is there the mean-field term?
++            if (b.elec_valley == c.elec_valley) and\
++            (b.elec_orb == c.elec_orb) and\
++            (b.elec_spin == c.elec_spin) and\
++            (b.elec_type == c.elec_type):
++                dummylist.append([coeff,a,d])    
++            
++            #anticommutation adds -1 to the coeff, swap dagger in internal terms
++            coeff = -1.0*coeff
++            b.dagger=False
++            c.dagger=True
++
++            #does the 4-operator term survive
++            if (b.dagger == False) and (d.dagger == False) and\
++            (b.elec_valley == d.elec_valley) and\
++            (b.elec_orb == d.elec_orb) and\
++            (b.elec_spin == d.elec_spin) and\
++            (b.elec_type == d.elec_type):
++                pass
++            elif (a.dagger == True) and (c.dagger == True) and\
++            (a.elec_valley == c.elec_valley) and\
++            (a.elec_orb == c.elec_orb) and\
++            (a.elec_spin == c.elec_spin) and\
++            (a.elec_type == c.elec_type):
++                pass
++            else:
++                dummylist.append([coeff,a,c,b,d])
++        
++    #copyback
++        self.op_terms=dummylist[:]
++        self.NO_FLAG=True
++ 
++    def decouple(self):
++        if self.NO_FLAG==False:
++            print("Operator is not normal ordered")
++            return
++        else:
++            for iterm in range(len(self.op_terms)):
++                term=self.op_terms[iterm]
++               
++                #save components of the term
++                coeff=term[0]
++                a=term[1]
++                b=term[2]
++                try:
++                    c=term[3]
++                    d=term[4]
++                    
++                    # -b+d<a+c>
++                    self.mf_decoupled.append([-1.0*coeff,b,d,a,c])
++                    # -a+c<b+d>
++                    self.mf_decoupled.append([-1.0*coeff,a,c,b,d])
++                    # b+c<a+d>
++                    self.mf_decoupled.append([coeff,b,c,a,d])
++                    # a+d<b+c>
++                    self.mf_decoupled.append([coeff,a,d,b,c])
++                #except it's already mean-field
++                except:
++                    # -a+b
++                    self.mf_decoupled.append([coeff,a,b])
++
++        
++    
++    def prettyprint(self):
++        for iterm in range(len(self.op_terms)):
++            term=self.op_terms[iterm]
++            coeff=term[0]
++            op_1=term[1]
++            op_2=term[2]
++            try:
++                op_3=term[3]
++                op_4=term[4]
++                if op_1.dagger==True:
++                    suffix1="dg"
++                else:
++                    suffix1=""
++                if op_2.dagger==True:
++                    suffix2="dg"
++                else:
++                    suffix2=""
++                if op_3.dagger==True:
++                    suffix3="dg"
++                else:
++                    suffix3=""
++                if op_4.dagger==True:
++                    suffix4="dg"
++                else:
++                    suffix4=""
++                print(str(coeff) +"  "\
++                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
++                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin)+" "\
++                + op_3.elec_type+suffix3+"_"+str(op_3.elec_valley)+"_"+str(op_3.elec_orb)+"_"+str(op_3.elec_spin)+" "\
++                + op_4.elec_type+suffix4+"_"+str(op_4.elec_valley)+"_"+str(op_4.elec_orb)+"_"+str(op_4.elec_spin))
++            except:
++                if op_1.dagger==True:
++                    suffix1="dg"
++                else:
++                    suffix1=""
++                if op_2.dagger==True:
++                    suffix2="dg"
++                else:
++                    suffix2=""
++                print(str(coeff) +"  "\
++                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
++                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
++                
++    def prettyprint_decoupled(self):
++        for iterm in range(len(self.mf_decoupled)):
++            term=self.mf_decoupled[iterm]
++            coeff=term[0]
++            op_1=term[1]
++            op_2=term[2]
++            #print which is dagger
++            if op_1.dagger==True:
++                suffix1="dg"
++            else:
++                suffix1=""
++            if op_2.dagger==True:
++                suffix2="dg"
++            else:
++                suffix2=""
++            #if there is a density term
++            try:
++                dens_1=term[3]
++                dens_2=term[4]
++                densStr="dens_"+dens_1.elec_type+"_"+str(dens_1.elec_valley)+"_"+str(dens_1.elec_orb)+"_"+str(dens_1.elec_spin)\
++                           +"_"+dens_2.elec_type+"_"+str(dens_2.elec_valley)+"_"+str(dens_2.elec_orb)+"_"+str(dens_2.elec_spin)
++            except:
++                densStr=""
++            print(str(coeff) +"  "\
++            +densStr+"  "
++            +op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
++            +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
++
++    def print_to_dc_decoupled(self):
++        self.operator_array_for_dc=[]
++        self.density_array_for_dc=[]
++        self.coeff_for_dc=[]
++        for iterm in range(len(self.mf_decoupled)):
++            term=self.mf_decoupled[iterm]
++            
++            coeff=term[0]
++            
++            op_1_type=term[1].elec_type
++            op_1_valley=term[1].elec_valley -1
++            op_1_orb=term[1].elec_orb -1
++            op_1_spin=term[1].elec_spin -1
++            
++            op_2_type=term[2].elec_type
++            op_2_valley=term[2].elec_valley -1
++            op_2_orb=term[2].elec_orb -1
++            op_2_spin=term[2].elec_spin -1
++            
++            try:
++                dens_1_type=term[3].elec_type
++                dens_1_valley=term[3].elec_valley -1
++                dens_1_orb=term[3].elec_orb -1
++                dens_1_spin=term[3].elec_spin -1
++                
++                dens_2_type=term[4].elec_type
++                dens_2_valley=term[4].elec_valley -1
++                dens_2_orb=term[4].elec_orb -1
++                dens_2_spin=term[4].elec_spin -1
++                
++                self.coeff_for_dc.append(coeff)
++                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
++                self.density_array_for_dc.append([dens_1_orb, dens_1_valley, dens_1_spin, dens_1_type, dens_2_orb, dens_2_valley, dens_2_spin, dens_2_type])
++            except:
++                self.coeff_for_dc.append(coeff)
++                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
++                self.density_array_for_dc.append(["NODENS"])
++        
++        
++        
++        return self.coeff_for_dc, self.operator_array_for_dc, self.density_array_for_dc
++
++
++
++
+diff --git a/w2dyn/dmft/mixing.py b/w2dyn/dmft/mixing.py
+index a6eeeea8..6f12035c 100644
+--- a/w2dyn/dmft/mixing.py
++++ b/w2dyn/dmft/mixing.py
+@@ -20,7 +20,7 @@ All mixer objects are callable, taking the new values as argument and
+ returning the next proposal/trial value.
+ """
+ import numpy as np
+-
++import sys
+ import w2dyn.auxiliaries.deepflatten as deepflatten
+ 
+ class InitialMixingDecorator(object):
+@@ -55,6 +55,53 @@ class FlatMixingDecorator(object):
+         x = self.mixer(x)
+         x = deepflatten.restore(x, shape, types)
+         return x
++        
++class StaggeredMixingDecorator(object):
++    """
++    This mixing decorator takes any kind of nested python lists with numbers and
++    numpy arrays and calls `mixer` with a one dimensional copy of the data. The
++    shape is restored after `mixer` returned.
++    """
++    def __init__(self, subblock, interval_d, interval_p, mixer):
++        self.Nd = int(subblock)
++        self.interval_d = int(interval_d)
++        self.interval_p = int(interval_p)
++        self.mixer = mixer
++        self.counter_d = 0
++        self.counter_p = 0
++        self.saved_value = None
++        print("DC: Experimental staggered mixer:")
++        print("DC: We will mix the first ",self.Nd," levels every ",self.interval_d)
++        print("DC: We will mix rest every ",self.interval_p)
++    def __call__(self, *args):
++        if len(args) == 1: 
++            args = np.asarray(args[0])
++        else:
++            args = np.asarray(args)
++        if self.saved_value is None:
++            print("DC: Save initial value")
++            self.saved_value = args
++        if self.counter_p % self.interval_p != 0:
++            print("DC: Not updating p-block at iteration ",self.counter_p)
++            tmp = np.copy(self.saved_value)
++        else:
++            print("DC: Updating p-block at iteration ",self.counter_p)
++            tmp = np.copy(args)
++        if self.counter_d % self.interval_d != 0:
++            print("DC: Not updating d-block at iteration ",self.counter_d)
++            tmp[...,0:self.Nd,:,0:self.Nd,:] = self.saved_value[...,0:self.Nd,:,0:self.Nd,:]
++        else:
++            print("DC: Updating d-block at iteration ",self.counter_d)
++            tmp[...,0:self.Nd,:,0:self.Nd,:] = args[...,0:self.Nd,:,0:self.Nd,:]
++        types = deepflatten.types(tmp)
++        shape = deepflatten.shapes(tmp)
++        x = deepflatten.flatten(tmp)
++        x = self.mixer(x)
++        x = deepflatten.restore(x, shape, types)
++        self.saved_value = np.asarray(x)
++        self.counter_d += 1
++        self.counter_p += 1
++        return x
+ 
+ class RealMixingDecorator(object):
+     """
+diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
+index 3f521730..017b3fbe 100644
+--- a/w2dyn/dmft/selfcons.py
++++ b/w2dyn/dmft/selfcons.py
+@@ -113,7 +113,7 @@ class FrequencyDistribution:
+ class DMFTStep:
+     def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
+                  udd_full=None, udp_full=None, upp_full=None, paramag=False,
+-                 siw_mixer=None, mu_mixer=None, mpi_comm=None):
++                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None, sigma_kick=0.0, sigma_kick_persist=1):
+ 
+         if beta < 0: raise ValueError("beta must be positive")
+         if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
+@@ -121,6 +121,7 @@ class DMFTStep:
+         if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
+         if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
+         if mu_mixer is None: mu_mixer = mixing.LinearMixer()
++        if dc_mixer is None: sys.exit("DC mixer not defined")
+ 
+         self.mpi_comm = mpi_comm
+ 
+@@ -132,6 +133,9 @@ class DMFTStep:
+         self.udp_full = udp_full
+         self.upp_full = upp_full
+         self.paramag = paramag
++        self.sigma_kick_thresh = sigma_kick
++        self.sigma_kick_persist = sigma_kick_persist
++        self.niter_kick = 0
+ 
+         if self.udp_full is None or upp_full is None:
+             self.use_hartree = False
+@@ -140,6 +144,7 @@ class DMFTStep:
+ 
+         self.siw_mixer = siw_mixer
+         self.mu_mixer = mu_mixer
++        self.dc_mixer = dc_mixer
+ 
+         self._eye = lattice.eye
+ 
+@@ -247,36 +252,66 @@ class DMFTStep:
+             for ineq_no, ineq in enumerate(self.ineq_list):
+                 siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
+                 ineq.d_setpart(self.sigma_hartree, 0)
+-
+-        # Perform mixing of self-energy, its moments and
+-        # double-counting with the same mixer. This is important to
+-        # keep them "consistent", i.e., double-count correlations at
+-        # the same rate as switching them on, and with DIIS, the
+-        # mixing of all related quantities using the same mixer is
+-        # necessary in particular because the earlier values
+-        # themselves influence the ratios in which they are mixed in.
++                
++        # now we do the self-consistent mixing as well.
++        # if dc_full is not None, it comes from a restarted run. We do not want to
++        # overwrite the restart value here!
++        if self.dc.self_cons and ( dc_full is None ):
++            # this currently should only work for trace dc
++            # todo: fix siginfbar
++            if new_run:
++                dens = None
++            else:
++                #print("AT LINE 261 SIW IS ",self.siw_full[0,0,0,0])
++                self.siw2gloc()
++                dens = self.get_loc_imp_mixdens()
++                #FIXME: put a kick in the density at the beginning
++                if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
++                    print("Adding dc kick for ",self.niter_kick + 1," steps out of ",self.sigma_kick_persist)
++                    if self.niter_kick == 0:
++                        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
++                        #itmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
++                        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
++                        #if self.mpi_comm is not None:
++                        #    self.mpi_comm.bcast(tmpmat, root=0)
++                        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
++                        np.fill_diagonal(tmpmat,0.0)
++                        #tmpmat[0:2,8:12]=0.0
++                        #tmpmat[2:4,4:8]=0.0
++                        #tmpmat[8:12,0:2]=0.0
++                        #tmpmat[4:8,2:4]=0.0
++                        for ispin in range(nspins):
++                            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
++                    dens += self.sigma_kick_mat
++                    self.niter_kick += 1    
++            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
++
++        #set numerically small elements to 0
++        self.dc_full[abs(self.dc_full) < 1e-10] = 0
++
++        # Perform mixing of self-energy, its moments
+         if mix:
+-            self.dc_full, self.siw_dd, self.smom_dd = self.siw_mixer(self.dc_full, siw_dd, smom_dd)
++            self.siw_dd, self.smom_dd = self.siw_mixer(siw_dd, smom_dd)
+         else:
+             self.siw_dd, self.smom_dd = siw_dd, smom_dd
++            
++        # Experimental doublecounting mixing
++        if mix:
++            self.dc_full = self.dc_mixer(self.dc_full)
+ 
+         # Fix the distance between selected d-orbitals and the p-manifold to the original distance of the LDA/GW Hamiltonian
+         if self.dc_dp == 1:
+             self.dc_full = self.dc_full * 0
+             dp_dc = doublecounting.Fixed_dp_Distance()
+             self.dc_full = -dp_dc.get(self.dc_full, self.siw_dd, self.smom_dd, self.iwf, self.natoms, self.dc_dp_orbitals)
++            
++        # Store impurity occupations for 'mixed' densities
++        self.occ_dd = occs
+ 
+-        # not doing mixing for self consistent dc
+-        # if we do want to mix... simply move this part above the mixing routine
+-        # if dc_full is not None, it comes from a restarted run. We do not want to
+-        # overwrite the restart value here!
+-        if self.dc.self_cons and ( dc_full is None ):
+-            # this currently should only work for trace dc
+-            # todo: fix siginfbar
+-            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws,occs=occs)
+         # Upfold self-energy.
+-        self.siw_full = 0
+-        self.siw_moments = 0
++        self.siw_full = 0j
++        self.siw_moments = 0j
++        
+         for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
+                                             self.smom_dd):
+             # Here, we potentially encounter a memory problem (a set of
+@@ -306,6 +341,21 @@ class DMFTStep:
+ 
+         self.siw_full += self.sigma_hartree
+         self.siw_moments[0] += self.sigma_hartree.real
++        
++        #FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
++        #if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
++        #    print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
++        #    if self.niter_kick == 0:
++        #        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
++        #        #tmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
++        #        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
++        #        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
++        #        np.fill_diagonal(tmpmat,0.0)
++        #        for ispin in range(nspins):
++        #            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
++        #    self.siw_full += self.sigma_kick_mat
++        #    self.siw_moments[0] += self.sigma_kick_mat  
++        #    self.niter_kick += 1
+ 
+         # Invalidate lattice quantities (call to siw2gloc necessary)
+         self.glociw = None
+@@ -360,6 +410,15 @@ class DMFTStep:
+         # Destroy large GW siw for MC cycle
+         self.siw_GW_dyn = None
+         #self.smom_GW = None
++        
++    def get_loc_imp_mixdens(self):
++        """Get densities from local lattice Green's function with
++        d-orbital entries replaced with last impurity results."""
++        mixdm = np.real(self.densmatrix).copy()
++        #if self.occ_dd is not None:
++        #    for ineq, occ_slice in zip(self.ineq_list, self.occ_dd):
++        #        ineq.d_setpart(mixdm, np.real(occ_slice))
++        return mixdm
+ 
+     def write_gloc(self, output, infix, full_od=False):
+         # This quantity is potentially distributed over cores, so we need to
