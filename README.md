@@ -16,7 +16,7 @@ terms and phonons.
 - YES:
     - make your modifications
     - git add -A
-    - git diff > NEW_PATCH_NAME.patch
+    - git diff --cached > NEW_PATCH_NAME.patch
     - save the new patch as real/complex in the appropriate folder
     - git reset
     - clean your repo (or remove the folder if you don't need it anymore)
