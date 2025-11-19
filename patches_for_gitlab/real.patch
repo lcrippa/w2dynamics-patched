@@ -1,5 +1,5 @@
 diff --git a/DMFT.py b/DMFT.py
-index f4987b44..c148c71e 100755
+index f4987b44..da4c8bb0 100755
 --- a/DMFT.py
 +++ b/DMFT.py
 @@ -290,9 +290,31 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
@@ -63,6 +63,24 @@ index f4987b44..c148c71e 100755
      dmft_step.set_mu(mu)
  else:
      log("Starting new run without self-energy for %s mu = %.6g ...",
+@@ -485,7 +518,7 @@ for iter_no in range(total_iterations + 1):
+                        or (mu_method in ('kappa', 'curvefit') and not kmuiter.has_mu())):
+             log("Computing lattice problem for old mu = %g ...", dmft_step.mu)
+             dmft_step.siw2gloc()
+-            log("Total density = %g", np.real_if_close(dmft_step.densities.sum()))
++            log("Total density = %g", dmft_step.densities.sum())
+ 
+             log("Writing lattice quantities for old mu to output file ...")
+             dmft_step.write_before_mu_search(output,
+@@ -498,7 +531,7 @@ for iter_no in range(total_iterations + 1):
+ 
+     log("Computing lattice problem for mu = %g ...", dmft_step.mu)
+     dmft_step.siw2gloc()
+-    log("Total density = %g", np.real_if_close(dmft_step.densities.sum()))
++    log("Total density = %g", dmft_step.densities.sum())
+ 
+     log("Writing lattice quantities to output file ...")
+     dmft_step.write_lattice_problem(output,
 diff --git a/testutils/create_umatrix/compare.sh b/testutils/create_umatrix/compare.sh
 new file mode 100755
 index 00000000..107a1169
