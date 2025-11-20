@@ -640,8 +640,8 @@ for iter_no in range(total_iterations + 1):
         output.write_quantity("smom", smoms)
         output.write_quantity("siw-trial", dmft_step.siw_dd)
 
-        log("Feeding back unmixed self-energies into lattice problem ...")
-        dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
+        #log("Feeding back unmixed self-energies into lattice problem ...")
+        #dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
 
         if fix_mu and mu_method in ("kappa", "curvefit"):
             imp_electrons_err = np.sqrt(imp_electrons_err)

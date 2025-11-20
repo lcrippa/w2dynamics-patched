@@ -387,6 +387,8 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
                                     np.array(cfg["General"]["Wterm_beta"],dtype=np.double),
                                     np.array(cfg["General"]["Wterm_shifts"],dtype=np.double),
                                     cfg["General"]["Wterm_rotationmatrix"],
+                                    np.array(cfg["General"]["Wterm_Fock"],dtype=bool),
+                                    np.array(cfg["General"]["Wterm_legacy"],dtype=bool),
                                     ineq_list, lda_dens, atom_list, u_full)
     else:
         raise NotImplemented("Unknown double counting scheme")

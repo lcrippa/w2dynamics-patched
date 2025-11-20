@@ -107,7 +107,7 @@ class ShellAveraged(DoubleCounting):
         # subspace.
         self.dens_mean = np.array([densities[sl].mean() for sl in self.slices])
         self.dens_sum = np.array([densities[sl].sum() for sl in self.slices])
-
+ 
         # Compute the mean U and J for every sub-shell.
         ubar = np.zeros((self.nshells, self.nshells))
         jbar = np.zeros((self.nshells, self.nshells))
@@ -192,7 +192,7 @@ class AroundMeanField(ShellAveraged):
     """
     def __init__(self, *args):
         ShellAveraged.__init__(self, *args)
-
+        
         dc_shell = self.ubar.dot(self.dens_sum) - self.jbar.dot(self.dens_sum/2)
         for I in range(self.nshells):
             dc_shell[I] -= self.ubar[I, I] * self.dens_mean[I]
@@ -226,9 +226,9 @@ class SelfConsistent(DoubleCounting):
         self.d_dens_sum = np.array([densities[sl].sum() for sl in self.d_slices])
         self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
         self.self_cons = True
-        
+
 class Wterm(SelfConsistent):
-    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, rotationmatrix, *args, **kwargs):
+    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, Fock, legacy, rotationmatrix, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sav = ShellAveraged(self.shell_av['densities'],
                                  self.shell_av['atom_list'],
@@ -242,6 +242,15 @@ class Wterm(SelfConsistent):
         self.a22 = a22
         self.a11 = a11
         self.beta = beta
+
+        self.Fock = Fock
+        self.legacy = legacy
+        self.do_phonons = False
+        
+        if abs(self.ll) > 1e-10:
+            self.do_phonons = True
+
+
         if rotationmatrix is not None:
             try:
                 with open(rotationmatrix, "rb") as f:
@@ -312,6 +321,7 @@ class Wterm(SelfConsistent):
         # Hartree shift #
         #################
         
+        print("DC: Hartree shift")
         for ispin in range(2):
             for iorb in range(0,4):
                 tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[0]
@@ -321,46 +331,71 @@ class Wterm(SelfConsistent):
         #################        
         # U2 terms #
         #################
-                    
-        for ispin in range(2):
-            for iorb_f in range(4):
-                tmp_dc_full[iorb_f,ispin,iorb_f,ispin] +=  6.0 * self.u2 * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
+        
+        if abs(self.u2) > 1e-10:
+            print("DC: U2 term")
+            for ispin in range(2):
+                for iorb_f in range(4):
+                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] +=  6.0 * self.u2 * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
         
         #################        
         # W and V terms #
         #################
-                
-        #W term 1 (S284)
-        for ispin in range(2):
-            for ival_c in range(2):
-                for iorb_c in range(4):
-                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-                    tmp_dc_full[index_c,ispin,index_c,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-
-        #W term 2 (S284)
-        for ispin in range(2):
-            for iorb_f in range(4):
-                for val_c in range(2):
+        
+        if self.legacy: #this is the old convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
+            print("DC: legacy. No Fock, no J, no phonons, cc reshuffle, all W are equal to W[0]")
+            shifts = np.array(self.shifts)
+            diag_dc = []
+            for atom in self.atom_list:
+                nu_corr = np.sum(diagonal_densities[atom.dslice, :] - np.full_like(diagonal_densities, 0.5)[atom.dslice, :])
+                nu_uncorr = sum(np.sum(diagonal_densities[sl, :] - np.full_like(diagonal_densities, 0.5)[sl, :]) for sl in atom.ligslices)
+                atslices = [atom.dslice, *atom.ligslices]
+                atshifts = shifts[:len(atslices)]
+                for i, shift in enumerate(atshifts):
+                    if i == 0:
+                        diag_dc.append(self.w[0] * (nu_uncorr - nu_corr) - self.v * nu_uncorr)
+                    else:
+                        diag_dc.append(0.0)
+                        
+            #double minus trick
+            self.sav.from_shell(np.array(diag_dc))
+            tmp_dc_full += -self.sav.dc_value
+        
+        else: #this is the most general expression of the mf-decoupled term, but currently it explodes in the loop. It's split between W and V terms
+            print("DC: W Hartree term")
+            #W term 1 (S284)
+            for ispin in range(2):
+                for ival_c in range(2):
                     for iorb_c in range(4):
                         index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-                        tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
+                        tmp_dc_full[index_c,ispin,index_c,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
 
-        #W term 3 (S284) This is the Fock term, which for now we don't consider
-        if True:
+            #W term 2 (S284)
             for ispin in range(2):
-                for jspin in range(2):
-                    for iorb_f in range(4):
-                        for ival_c in range(2):
-                            for iorb_c in range(4):
-                                index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-                                tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
-                                tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
+                for iorb_f in range(4):
+                    for val_c in range(2):
+                        for iorb_c in range(4):
+                            index_c = self.orbvalley_index(iorb_c,ival_c,"c")
+                            tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
+
+            #W term 3 (S284) This is the Fock term, which for now we don't consider
+            if self.Fock:
+                print("DC: W Fock term")
+                for ispin in range(2):
+                    for jspin in range(2):
+                        for iorb_f in range(4):
+                            for ival_c in range(2):
+                                for iorb_c in range(4):
+                                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
+                                    tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
+                                    tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
 
         
-        #V term (S292)
-        for ispin in range(2):
-            for iorb_c in range(4,12):
-                tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
+            #V term (S292)
+            print("DC: V Hartree term")
+            for ispin in range(2):
+                for iorb_c in range(4,12):
+                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
                     
         ##########
         # J term # 
@@ -369,157 +404,157 @@ class Wterm(SelfConsistent):
         #(S288) of the PRL
         
         #Here we try in the way we wrote it in the PRX supplementary or equivalently Haoyu's PRL
-        Jmatrix = np.zeros_like(tmp_dc_full)
-        
-        #First term of S16
-        for iorb in range(2):
-            for jorb in range(2):
-                for ival in range(2):
-                    for jval in range(2):
-                        for ispin in range(2):
-                            for jspin in range(2):
-                                ival_sign = (-1)**ival #valley 1 is plus valley, valley 2 is minus valley
-                                jval_sign = (-1)**jval
-                                prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) ) #+1 because python indexes start from 0, but it makes no difference
-                                
-                                i_f = self.orbvalley_index_j(iorb,ival,"f")
-                                j_f = self.orbvalley_index_j(jorb,jval,"f")
-                                i_c = self.orbvalley_index_j(iorb,ival,"c")
-                                j_c = self.orbvalley_index_j(jorb,jval,"c")
-                                                                    
-                                Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
+        if not self.legacy:
+            print("J Hartree term")
+            
+            Jmatrix = np.zeros_like(tmp_dc_full)
+            
+            #First term of S16 of our PRX
+            for iorb in range(2):
+                for jorb in range(2):
+                    for ival in range(2):
+                        for jval in range(2):
+                            for ispin in range(2):
+                                for jspin in range(2):
+                                    ival_sign = (-1)**ival #valley 1 is plus valley, valley 2 is minus valley
+                                    jval_sign = (-1)**jval
+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) ) #+1 because python indexes start from 0, but it makes no difference
+                                    
+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
+                                                                        
+                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
 
-        #Second term of S16
-        for iorb in range(2):
-            for jorb in range(2):
-                for ival in range(2):
-                    for jval in range(2):
-                        for ispin in range(2):
-                            for jspin in range(2):
-                                ival_sign = (-1)**ival
-                                jval_sign = (-1)**jval
-                                prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) )
-                                
-                                i_f = self.orbvalley_index_j(iorb,ival,"f")
-                                j_f = self.orbvalley_index_j(jorb,jval,"f")
-                                i_c = self.orbvalley_index_j(iorb,ival,"c")
-                                j_c = self.orbvalley_index_j(jorb,jval,"c")
-                                
-                                Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
-
-        #########################################
-        ## THE FOCK TERM                       ##
-        #########################################
-        
-        #Fock term from (S290) Song-Bernevig
-        for iorb in range(2):
-            for jorb in range(2):
-                for ival in range(2):
-                    for jval in range(2):
-                        for ispin in range(2):
-                            for jspin in range(2):
-                                sign_ival = (-1) ** ival
-                                sign_jval = (-1) ** jval
-                                deltaval = sign_ival * sign_jval  + (-1)**(iorb + 1 + jorb + 1)
-                                i_f = self.orbvalley_index_j(iorb,ival,"f")
-                                i_c = self.orbvalley_index_j(iorb,ival,"c")
-                                j_f = self.orbvalley_index_j(jorb,jval,"f")
-                                j_c = self.orbvalley_index_j(jorb,jval,"c")
-                                Jmatrix[i_f,ispin,i_c,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
-                                Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
-        print("Fock term from S290")
-        
-        #Sum the J matrix to the DC
-        print("Summing J term")
-        tmp_dc_full += Jmatrix
+            #Second term of S16
+            for iorb in range(2):
+                for jorb in range(2):
+                    for ival in range(2):
+                        for jval in range(2):
+                            for ispin in range(2):
+                                for jspin in range(2):
+                                    ival_sign = (-1)**ival
+                                    jval_sign = (-1)**jval
+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) )
+                                    
+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
+                                    
+                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
+            
+            if self.Fock:
+                print("DC: J Fock term")
+                #Fock term from (S290) Song-Bernevig
+                for iorb in range(2):
+                    for jorb in range(2):
+                        for ival in range(2):
+                            for jval in range(2):
+                                for ispin in range(2):
+                                    for jspin in range(2):
+                                        sign_ival = (-1) ** ival
+                                        sign_jval = (-1) ** jval
+                                        deltaval = sign_ival * sign_jval  + (-1)**(iorb + 1 + jorb + 1)
+                                        i_f = self.orbvalley_index_j(iorb,ival,"f")
+                                        i_c = self.orbvalley_index_j(iorb,ival,"c")
+                                        j_f = self.orbvalley_index_j(jorb,jval,"f")
+                                        j_c = self.orbvalley_index_j(jorb,jval,"c")
+                                        Jmatrix[i_f,ispin,i_c,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
+                                        Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
+                
+            #Sum the J matrix to the DC
+            tmp_dc_full += Jmatrix
             
         ################################
         # Phonons mean-field decoupled #
         ################################
-        
-        ph=phonons.phonon_1bo_params(self.a11,self.beta)
-        
-        # f+f terms without density (coming from anticommutators in u_matrix), x and y
-        for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
-            firstop=phonons.onebody_op("f",phononterm[0])
-            firstop.create_1bo()
-            secondop=phonons.onebody_op("f",phononterm[1])
-            secondop.create_1bo()
-            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22**2)
-            twobodyterm.create_2bo()
-            twobodyterm.normalorder()
-            twobodyterm.decouple()
-            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-            for iterm in range(len(dc_coeff_array)):
-                if dc_dens_array[iterm][0]=="NODENS":
-                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
-                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-                    ispin  = dc_op_array[iterm][2]
-                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-                    jspin  = dc_op_array[iterm][6]
-                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-                    
-        # f+c terms, x and y
-        for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
-            firstop=phonons.onebody_op("f",phononterm[0])
-            firstop.create_1bo()
-            secondop=phonons.onebody_op("c",phononterm[1])
-            secondop.create_1bo()
-            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22)
-            twobodyterm.create_2bo()
-            twobodyterm.normalorder()
-            twobodyterm.decouple()
-            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-            for iterm in range(len(dc_coeff_array)):
-                if dc_dens_array[iterm][0]=="NODENS":
-                    # orb1 val1 spin1 type1 orb2 val2 spin2 type2
-                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-                    ispin  = dc_op_array[iterm][2]
-                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-                    jspin  = dc_op_array[iterm][6]
-                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-                else:
-                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-                    ispin  = dc_op_array[iterm][2]
-                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-                    jspin  = dc_op_array[iterm][6]
-                    
-                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-                    dens_ispin  = dc_dens_array[iterm][2]
-                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-                    dens_jspin  = dc_dens_array[iterm][6]
-                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
+        if self.do_phonons and not self.legacy:
+            print("DC: phonon terms")
+            ph=phonons.phonon_1bo_params(self.a11,self.beta)
+            
+            # f+f terms without density (coming from anticommutators in u_matrix), x and y
+            for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
+                firstop=phonons.onebody_op("f",phononterm[0])
+                firstop.create_1bo()
+                secondop=phonons.onebody_op("f",phononterm[1])
+                secondop.create_1bo()
+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22**2)
+                twobodyterm.create_2bo()
+                twobodyterm.normalorder()
+                twobodyterm.decouple()
+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+                for iterm in range(len(dc_coeff_array)):
+                    if dc_dens_array[iterm][0]=="NODENS":
+                        # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                        ispin  = dc_op_array[iterm][2]
+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                        jspin  = dc_op_array[iterm][6]
+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
                         
-        # c+c terms, x and y
-        for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
-            firstop=phonons.onebody_op("c",phononterm[0])
-            firstop.create_1bo()
-            secondop=phonons.onebody_op("c",phononterm[1])
-            secondop.create_1bo()
-            twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll)
-            twobodyterm.create_2bo()
-            twobodyterm.normalorder()
-            twobodyterm.decouple()
-            dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-            for iterm in range(len(dc_coeff_array)):
-                if dc_dens_array[iterm][0]=="NODENS":
-                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-                    ispin  = dc_op_array[iterm][2]
-                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-                    jspin  = dc_op_array[iterm][6]
-                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-                else:
-                    iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-                    ispin  = dc_op_array[iterm][2]
-                    jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-                    jspin  = dc_op_array[iterm][6]
-                    
-                    dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-                    dens_ispin  = dc_op_array[iterm][2]
-                    dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-                    dens_jspin  = dc_op_array[iterm][6]
-                    
-                    tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
+            # f+c terms, x and y
+            for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
+                firstop=phonons.onebody_op("f",phononterm[0])
+                firstop.create_1bo()
+                secondop=phonons.onebody_op("c",phononterm[1])
+                secondop.create_1bo()
+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22)
+                twobodyterm.create_2bo()
+                twobodyterm.normalorder()
+                twobodyterm.decouple()
+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+                for iterm in range(len(dc_coeff_array)):
+                    if dc_dens_array[iterm][0]=="NODENS":
+                        # orb1 val1 spin1 type1 orb2 val2 spin2 type2
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                        ispin  = dc_op_array[iterm][2]
+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                        jspin  = dc_op_array[iterm][6]
+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
+                    else:
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                        ispin  = dc_op_array[iterm][2]
+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                        jspin  = dc_op_array[iterm][6]
+                        
+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+                        dens_ispin  = dc_dens_array[iterm][2]
+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+                        dens_jspin  = dc_dens_array[iterm][6]
+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
+                            
+            # c+c terms, x and y
+            for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
+                firstop=phonons.onebody_op("c",phononterm[0])
+                firstop.create_1bo()
+                secondop=phonons.onebody_op("c",phononterm[1])
+                secondop.create_1bo()
+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll)
+                twobodyterm.create_2bo()
+                twobodyterm.normalorder()
+                twobodyterm.decouple()
+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
+                for iterm in range(len(dc_coeff_array)):
+                    if dc_dens_array[iterm][0]=="NODENS":
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                        ispin  = dc_op_array[iterm][2]
+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                        jspin  = dc_op_array[iterm][6]
+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
+                    else:
+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
+                        ispin  = dc_op_array[iterm][2]
+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
+                        jspin  = dc_op_array[iterm][6]
+                        
+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
+                        dens_ispin  = dc_op_array[iterm][2]
+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
+                        dens_jspin  = dc_op_array[iterm][6]
+                        
+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
         
         
         ######################
@@ -560,10 +595,10 @@ class SigZeroBar(SelfConsistent):
             return self.dc_value
         for ineq, siw in zip(self.ineq_list, siws):
             niw = siw.shape[0]
-            szero = siw[niw//2] # lowest Matsubara point of self-energy,
-                                # since ReS not very w-dependent. might not
-                                # be good enough for high T. Should do
-                                # (simple) extrapolation instead...
+            szero = siw[niw//2] # lowest Matsubara point of self-energy, 
+                                # since ReS not very w-dependent. might not 
+                                # be good enough for high T. Should do 
+                                # (simple) extrapolation instead... 
 
             szerobar = szero.trace(0,1,3).trace().real
             szerobar /= ineq.nd * self.nspins
@@ -577,7 +612,7 @@ class SigInfBar(SelfConsistent):
         self.dc_value[...] = 0
         if smoms is None:
             return self.dc_value
-
+            
         for ineq, smom in zip(self.ineq_list, smoms):
             sinf = smom[0]     # 0-th moment
             sinfbar = sinf.trace(0,1,3).trace()
@@ -628,7 +663,7 @@ class Trace(SelfConsistent):
                 dens0_impurity = ineq.occ_dc_number
             else:
                 dens0_impurity = occ0
-
+            
             # If the DOS at the Fermi level is large, we do not want to adjust
             # too much for stability reasons (fudging)
             if dos_fermi_level > 1.:

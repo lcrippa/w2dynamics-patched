@@ -226,6 +226,8 @@ Wterm_ll        = float(default=0.0)
 Wterm_a22       = float(default=0.0)
 Wterm_a11       = float(default=0.0)
 Wterm_beta      = float(default=0.0)
+Wterm_Fock      = boolean(default=True)
+Wterm_legacy    = boolean(default=False)
 Neps            = integer(default=1000)         # numerical integration of DOS
 
 # fix mu parameters
