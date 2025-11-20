@@ -1298,7 +1298,7 @@ index 9c369f03..f6ff2003 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..bdb86f40 100644
+index 07f954ba..92d56520 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1310,7 +1310,7 @@ index 07f954ba..bdb86f40 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,316 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,318 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -1364,7 +1364,7 @@ index 07f954ba..bdb86f40 100644
 +        densities = np.real(densities)
 +        diagonal_densities = orbspin.extract_diagonal(densities)
 +        shifts = np.array(self.shifts)
-+        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))*1j
++        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins),dtype=complex)
 +        
 +        #################
 +        # Hartree shift #
@@ -1449,6 +1449,8 @@ index 07f954ba..bdb86f40 100644
 +        ##########
 +        # J term # 
 +        ##########
++        
++        #(S288) of the PRL
 +        
 +        #Here we try in the way we wrote it in the PRX supplementary or equivalently Haoyu's PRL
 +        if not self.legacy:
