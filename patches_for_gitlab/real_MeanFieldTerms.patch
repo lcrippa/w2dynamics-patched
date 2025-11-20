@@ -2682,7 +2682,7 @@ index b7c8d284..99df84ae 100644
          raise NotImplemented("Unknown double counting scheme")
  
 diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
-index 9c369f03..1e3a0396 100644
+index 9c369f03..f0570652 100644
 --- a/w2dyn/auxiliaries/configspec
 +++ b/w2dyn/auxiliaries/configspec
 @@ -281,12 +281,31 @@ mu_mixing       = float(default=0.0)            # mix in old chemical potential
@@ -2690,7 +2690,7 @@ index 9c369f03..1e3a0396 100644
  # additional values for LDA+DMFT calculations
  NAt             = integer(default=1)
 -dc              = option_or_list('anisimov','fll','amf','trace','siginfbar','sigzerobar',default='anisimov')
-+dc              = option_or_list('anisimov','fll','Wterm','amf','trace','siginfbar','sigzerobar',default='anisimov')
++dc              = option_or_list('anisimov','fll','MeanFieldTerms','Wterm','amf','trace','siginfbar','sigzerobar',default='anisimov')
  dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
 +dc_mixing_strategy = option('linear','diis', default='linear')	 	# mixing between old and new SE
 +dc_subblock     = integer(default=4)            # the d subblock
