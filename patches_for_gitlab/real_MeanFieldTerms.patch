@@ -2654,7 +2654,7 @@ index 00000000..9402ed34
 +Percentage4OperatorMove=0.02
 +MeasSusz=1
 diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
-index b7c8d284..99df84ae 100644
+index b7c8d284..f4d415d3 100644
 --- a/w2dyn/auxiliaries/config.py
 +++ b/w2dyn/auxiliaries/config.py
 @@ -365,6 +365,23 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
@@ -2675,9 +2675,9 @@ index b7c8d284..99df84ae 100644
 +                                    np.array(cfg["General"]["Wterm_legacy"],dtype=bool),
 +                                    ineq_list, lda_dens, atom_list, u_full)
 +    elif dc_type == 'MeanFieldTerms':
-+        return doublecounting.Wterm(cfg["General"]["MeanFieldTermsA"],
-+                                    cfg["General"]["MeanFieldTermsB"],
-+                                    ineq_list, lda_dens, atom_list, u_full)
++        return doublecounting.MeanFieldTerms(cfg["General"]["MeanFieldTermsA"],
++                                             cfg["General"]["MeanFieldTermsB"],
++                                             ineq_list, lda_dens, atom_list, u_full)
      else:
          raise NotImplemented("Unknown double counting scheme")
  
