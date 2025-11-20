@@ -1023,7 +1023,7 @@ index c3441591..7cc8929b 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 94059d71..c2a51e59 100644
+index 94059d71..a3ac16d5 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
@@ -1204,7 +1204,7 @@ index 94059d71..c2a51e59 100644
 +            #W term 2 (S284)
 +            for ispin in range(2):
 +                for iorb_f in range(4):
-+                    for val_c in range(2):
++                    for ival_c in range(2):
 +                        for iorb_c in range(4):
 +                            index_c = self.orbvalley_index(iorb_c,ival_c,"c")
 +                            tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])

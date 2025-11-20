@@ -358,7 +358,7 @@ class Wterm(SelfConsistent):
             #W term 2 (S284)
             for ispin in range(2):
                 for iorb_f in range(4):
-                    for val_c in range(2):
+                    for ival_c in range(2):
                         for iorb_c in range(4):
                             index_c = self.orbvalley_index(iorb_c,ival_c,"c")
                             tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
