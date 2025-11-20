@@ -1,5 +1,5 @@
 diff --git a/DMFT.py b/DMFT.py
-index f4987b44..da4c8bb0 100755
+index f4987b44..b798994f 100755
 --- a/DMFT.py
 +++ b/DMFT.py
 @@ -290,9 +290,31 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
@@ -81,6 +81,17 @@ index f4987b44..da4c8bb0 100755
  
      log("Writing lattice quantities to output file ...")
      dmft_step.write_lattice_problem(output,
+@@ -606,8 +639,8 @@ for iter_no in range(total_iterations + 1):
+         output.write_quantity("smom", smoms)
+         output.write_quantity("siw-trial", dmft_step.siw_dd)
+ 
+-        log("Feeding back unmixed self-energies into lattice problem ...")
+-        dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
++        #log("Feeding back unmixed self-energies into lattice problem ...")
++        #dmft_step.set_siws(siws, smoms, giws=giws, occs=occs, mix=False)
+ 
+         if fix_mu and mu_method in ("kappa", "curvefit"):
+             imp_electrons_err = np.sqrt(imp_electrons_err)
 diff --git a/testutils/create_umatrix/compare.sh b/testutils/create_umatrix/compare.sh
 new file mode 100755
 index 00000000..107a1169
@@ -1287,7 +1298,7 @@ index 9c369f03..f6ff2003 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..78781694 100644
+index 07f954ba..c10e06db 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1381,7 +1392,7 @@ index 07f954ba..78781694 100644
 +        #################
 +        
 +        if self.legacy: #this is the old convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
-+            print("DC: legacy. No Fock, no J, no phonons, cc reshuffle")
++            print("DC: legacy. No Fock, no J, no phonons, cc reshuffle, all W are equal to W[0]")
 +            shifts = np.array(self.shifts)
 +            diag_dc = []
 +            for atom in self.atom_list:
@@ -1507,7 +1518,7 @@ index 07f954ba..78781694 100644
 +        ################################
 +        # Phonons mean-field decoupled #
 +        ################################
-+        if self.do_phonons:
++        if self.do_phonons and not self.legacy:
 +            print("DC: phonon terms")
 +            ph=phonons.phonon_1bo_params(self.a11,self.beta)
 +            
