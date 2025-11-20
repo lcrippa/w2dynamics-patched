@@ -2852,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..f5e091a9 100644
+index 07f954ba..422caf9d 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
@@ -2885,7 +2885,7 @@ index 07f954ba..f5e091a9 100644
 +        
 +        with open(self.Afile, "r") as Aread:
 +            self.A = inpt.read_u_matrix(Aread,spin=True)
-+        with open(self.Nfile, "r") as Bread:
++        with open(self.Bfile, "r") as Bread:
 +            self.B = inpt.read_mean_field_file(Bread)
 +                      
 +    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
