@@ -1298,7 +1298,7 @@ index 9c369f03..f6ff2003 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..c10e06db 100644
+index 07f954ba..bdb86f40 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1310,7 +1310,7 @@ index 07f954ba..c10e06db 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,317 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,316 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -1370,8 +1370,8 @@ index 07f954ba..c10e06db 100644
 +        # Hartree shift #
 +        #################
 +        
++        print("DC: Hartree shift")
 +        for ispin in range(2):
-+            print("DC: Hartree shift")
 +            for iorb in range(0,4):
 +                tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[0]
 +            for iorb in range(4,12):
@@ -1512,7 +1512,6 @@ index 07f954ba..c10e06db 100644
 +                                        Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
 +                
 +            #Sum the J matrix to the DC
-+            print("DC: J term")
 +            tmp_dc_full += Jmatrix
 +            
 +        ################################
