@@ -92,11 +92,11 @@ index f4987b44..b798994f 100755
  
          if fix_mu and mu_method in ("kappa", "curvefit"):
              imp_electrons_err = np.sqrt(imp_electrons_err)
-diff --git a/blg_utils/MeanFieldTerms/check_dc.py b/blg_utils/MeanFieldTerms/check_dc.py
+diff --git a/blg_utils/MeanFieldTerms/check.py b/blg_utils/MeanFieldTerms/check.py
 new file mode 100644
-index 00000000..1bbed3a9
+index 00000000..94412608
 --- /dev/null
-+++ b/blg_utils/MeanFieldTerms/check_dc.py
++++ b/blg_utils/MeanFieldTerms/check.py
 @@ -0,0 +1,35 @@
 +from __future__ import (absolute_import, division,
 +                        print_function, unicode_literals)
@@ -105,20 +105,20 @@ index 00000000..1bbed3a9
 +import numpy as np
 +import w2dyn.dmft.orbspin as orbspin
 +import w2dyn.dmft.atoms as atoms
-+import dc_from_w2dyn as doublecounting
++import dc_wterm as doublecounting
 +import mf_phonons as phonons
 +import w2dyn.auxiliaries.input as inpt
 +
 +
-+u2 = 0.0
++u2 = 0.5
 +w = [44.03,44.03,50.20,50.20]
 +v = 48.33
 +jj = 16.38
 +shifts = [-202.825, 0]
-+ll = 0.0
-+a22 = 0.0
-+a11 = 0.0
-+beta = 0.0
++ll = 1.0
++a22 = 2.0
++a11 = 3.0
++beta = 4.0
 +
 +densities = np.random.rand(12, 2, 12, 2)
 +
@@ -133,12 +133,12 @@ index 00000000..1bbed3a9
 +dc_from_wterm = dc_wterm.get(densities=densities)
 +
 +print(np.allclose(dc_from_mf_terms,dc_from_wterm))
-diff --git a/blg_utils/MeanFieldTerms/dc_from_w2dyn.py b/blg_utils/MeanFieldTerms/dc_from_w2dyn.py
+diff --git a/blg_utils/MeanFieldTerms/dc_wterm.py b/blg_utils/MeanFieldTerms/dc_wterm.py
 new file mode 100644
-index 00000000..fda63a8d
+index 00000000..3abed88b
 --- /dev/null
-+++ b/blg_utils/MeanFieldTerms/dc_from_w2dyn.py
-@@ -0,0 +1,755 @@
++++ b/blg_utils/MeanFieldTerms/dc_wterm.py
+@@ -0,0 +1,722 @@
 +"""Classes for double-counting correction"""
 +
 +from __future__ import (absolute_import, division,
@@ -147,7 +147,7 @@ index 00000000..fda63a8d
 +import w2dyn.dmft.orbspin as orbspin
 +import w2dyn.dmft.atoms as atoms
 +import sys
-+import w2dyn.dmft.mf_phonons as phonons
++import mf_phonons as phonons
 +import w2dyn.auxiliaries.input as inpt
 +# import w2dyn.dmft.lattice as lattice
 +# import w2dyn.auxiliaries.transform as tf
@@ -367,39 +367,6 @@ index 00000000..fda63a8d
 +        self.d_dens_sum = np.array([densities[sl].sum() for sl in self.d_slices])
 +        self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
 +        self.self_cons = True
-+
-+
-+class MeanFieldTerms(SelfConsistent):
-+    r"""
-+    This returns a mean-field term given two matrices A and B that looks like
-+    A*density_matrix +  B
-+    """
-+    def __init__(self, Afile, Bfile, *args, **kwargs):
-+        super().__init__(*args, **kwargs)
-+        self.sav = ShellAveraged(self.shell_av['densities'],
-+                                 self.shell_av['atom_list'],
-+                                 self.shell_av['u_full'])
-+        self.Afile = Afile
-+        self.Bfile = Bfile
-+        
-+        self.Amatrix = inpt.read_mean_field_file(self.Afile)
-+        if self.Bfile is not None:
-+            self.Bmatrix = inpt.read_mean_field_file(self.Bfile)
-+                      
-+    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
-+        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
-+            #sys.exit("Fix, we need a proper density matrix")
-+            densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
-+            for iorb in range(12):
-+                for ispin in range(2):
-+                    densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
-+
-+        densities = np.real(densities)
-+        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins),dtype=complex)
-+        
-+        dc_from_mf_terms = np.einsum('ijklabcd,abcd->ijkl', A, densities) + B
-+        
-+        
 +        
 +
 +class Wterm():
@@ -677,9 +644,9 @@ index 00000000..fda63a8d
 +                        jspin  = dc_op_array[iterm][6]
 +                        
 +                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-+                        dens_ispin  = dc_op_array[iterm][2]
++                        dens_ispin  = dc_dens_array[iterm][2]
 +                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-+                        dens_jspin  = dc_op_array[iterm][6]
++                        dens_jspin  = dc_dens_array[iterm][6]
 +                        
 +                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
 +        
@@ -896,10 +863,10 @@ index 00000000..fda63a8d
 +    return dc
 diff --git a/blg_utils/MeanFieldTerms/mean_field_terms.py b/blg_utils/MeanFieldTerms/mean_field_terms.py
 new file mode 100644
-index 00000000..971c0c38
+index 00000000..e8029644
 --- /dev/null
 +++ b/blg_utils/MeanFieldTerms/mean_field_terms.py
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,251 @@
 +from __future__ import (absolute_import, division,
 +                        print_function, unicode_literals)
 +import sys
@@ -911,15 +878,15 @@ index 00000000..971c0c38
 +import w2dyn.auxiliaries.input as inpt
 +
 +
-+u2 = 0.0
++u2 = 0.5
 +w = [44.03,44.03,50.20,50.20]
 +v = 48.33
 +jj = 16.38
 +shifts = [-202.825, 0]
-+ll = 0.0
-+a22 = 0.0
-+a11 = 0.0
-+beta = 0.0
++ll = 1.0
++a22 = 2.0
++a11 = 3.0
++beta = 4.0
 +
 +
 +#densities = np.real(densities)
@@ -1104,89 +1071,43 @@ index 00000000..971c0c38
 +print("DC: phonon terms")
 +ph = phonons.phonon_1bo_params(a11, beta)
 +
++def add_phonon_terms(matlist,type1,type2,coeff):
++    for phononterm in matlist:
++        firstop = phonons.onebody_op(type1, phononterm[0])
++        firstop.create_1bo()
++        secondop = phonons.onebody_op(type2, phononterm[1])
++        secondop.create_1bo()
++        twobodyterm = phonons.twobody_op(firstop, secondop, coeff)
++        twobodyterm.create_2bo()
++        twobodyterm.normalorder()
++        twobodyterm.decouple()
++        dc_coeff_array, dc_op_array, dc_dens_array = twobodyterm.print_to_dc_decoupled()
++
++        for iterm in range(len(dc_coeff_array)):
++            iindex = orbvalley_index(dc_op_array[iterm][0], dc_op_array[iterm][1], dc_op_array[iterm][3])
++            ispin  = dc_op_array[iterm][2]
++            jindex = orbvalley_index(dc_op_array[iterm][4], dc_op_array[iterm][5], dc_op_array[iterm][7])
++            jspin  = dc_op_array[iterm][6]
++
++            if dc_dens_array[iterm][0] == "NODENS":
++                B[iindex, ispin, jindex, jspin] += dc_coeff_array[iterm]
++            elif (type1!="f" or type2!="f"):
++                dens_i = orbvalley_index(dc_dens_array[iterm][0], dc_dens_array[iterm][1], dc_dens_array[iterm][3])
++                dens_s1 = dc_dens_array[iterm][2]
++                dens_j = orbvalley_index(dc_dens_array[iterm][4], dc_dens_array[iterm][5], dc_dens_array[iterm][7])
++                dens_s2 = dc_dens_array[iterm][6]
++
++                A[iindex, ispin, jindex, jspin, dens_i, dens_s1, dens_j, dens_s2] += dc_coeff_array[iterm]
++
++
 +# f+f terms
-+for phononterm in [[ph.VfX, ph.VfX], [ph.VfY, ph.VfY]]:
-+    firstop = phonons.onebody_op("f", phononterm[0])
-+    firstop.create_1bo()
-+    secondop = phonons.onebody_op("f", phononterm[1])
-+    secondop.create_1bo()
-+    twobodyterm = phonons.twobody_op(firstop, secondop, -ll*a22**2)
-+    twobodyterm.create_2bo()
-+    twobodyterm.normalorder()
-+    twobodyterm.decouple()
-+    dc_coeff_array, dc_op_array, dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+
-+    for iterm in range(len(dc_coeff_array)):
-+        iindex = orbvalley_index(dc_op_array[iterm][0], dc_op_array[iterm][1], dc_op_array[iterm][3])
-+        ispin  = dc_op_array[iterm][2]
-+        jindex = orbvalley_index(dc_op_array[iterm][4], dc_op_array[iterm][5], dc_op_array[iterm][7])
-+        jspin  = dc_op_array[iterm][6]
-+
-+        if dc_dens_array[iterm][0] == "NODENS":
-+            B[iindex, ispin, jindex, jspin] += dc_coeff_array[iterm]
-+        else:
-+            dens_i = orbvalley_index(dc_dens_array[iterm][0], dc_dens_array[iterm][1], dc_dens_array[iterm][3])
-+            dens_s1 = dc_dens_array[iterm][2]
-+            dens_j = orbvalley_index(dc_dens_array[iterm][4], dc_dens_array[iterm][5], dc_dens_array[iterm][7])
-+            dens_s2 = dc_dens_array[iterm][6]
-+
-+            A[iindex, ispin, jindex, jspin, dens_i, dens_s1, dens_j, dens_s2] += dc_coeff_array[iterm]
++add_phonon_terms([[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]],"f","f",-1*ll*a22**2)
 +
 +# f+c terms
-+for phononterm in [[ph.VfX, ph.VcX], [ph.VfY, ph.VcY]]:
-+    firstop = phonons.onebody_op("f", phononterm[0])
-+    firstop.create_1bo()
-+    secondop = phonons.onebody_op("c", phononterm[1])
-+    secondop.create_1bo()
-+    twobodyterm = phonons.twobody_op(firstop, secondop, -ll*a22)
-+    twobodyterm.create_2bo()
-+    twobodyterm.normalorder()
-+    twobodyterm.decouple()
-+    dc_coeff_array, dc_op_array, dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+
-+    for iterm in range(len(dc_coeff_array)):
-+        iindex = orbvalley_index(dc_op_array[iterm][0], dc_op_array[iterm][1], dc_op_array[iterm][3])
-+        ispin  = dc_op_array[iterm][2]
-+        jindex = orbvalley_index(dc_op_array[iterm][4], dc_op_array[iterm][5], dc_op_array[iterm][7])
-+        jspin  = dc_op_array[iterm][6]
-+
-+        if dc_dens_array[iterm][0] == "NODENS":
-+            B[iindex, ispin, jindex, jspin] += dc_coeff_array[iterm]
-+        else:
-+            dens_i = orbvalley_index(dc_dens_array[iterm][0], dc_dens_array[iterm][1], dc_dens_array[iterm][3])
-+            dens_s1 = dc_dens_array[iterm][2]
-+            dens_j = orbvalley_index(dc_dens_array[iterm][4], dc_dens_array[iterm][5], dc_dens_array[iterm][7])
-+            dens_s2 = dc_dens_array[iterm][6]
-+
-+            A[iindex, ispin, jindex, jspin, dens_i, dens_s1, dens_j, dens_s2] += dc_coeff_array[iterm]
++add_phonon_terms([[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]],"f","c",-1*ll*a22)
 +
 +# c+c terms
-+for phononterm in [[ph.VcX, ph.VcX], [ph.VcY, ph.VcY]]:
-+    firstop = phonons.onebody_op("c", phononterm[0])
-+    firstop.create_1bo()
-+    secondop = phonons.onebody_op("c", phononterm[1])
-+    secondop.create_1bo()
-+    twobodyterm = phonons.twobody_op(firstop, secondop, -ll)
-+    twobodyterm.create_2bo()
-+    twobodyterm.normalorder()
-+    twobodyterm.decouple()
-+    dc_coeff_array, dc_op_array, dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+
-+    for iterm in range(len(dc_coeff_array)):
-+        iindex = orbvalley_index(dc_op_array[iterm][0], dc_op_array[iterm][1], dc_op_array[iterm][3])
-+        ispin  = dc_op_array[iterm][2]
-+        jindex = orbvalley_index(dc_op_array[iterm][4], dc_op_array[iterm][5], dc_op_array[iterm][7])
-+        jspin  = dc_op_array[iterm][6]
-+
-+        if dc_dens_array[iterm][0] == "NODENS":
-+            B[iindex, ispin, jindex, jspin] += dc_coeff_array[iterm]
-+        else:
-+            dens_i = orbvalley_index(dc_dens_array[iterm][0], dc_dens_array[iterm][1], dc_dens_array[iterm][3])
-+            dens_s1 = dc_dens_array[iterm][2]
-+            dens_j = orbvalley_index(dc_dens_array[iterm][4], dc_dens_array[iterm][5], dc_dens_array[iterm][7])
-+            dens_s2 = dc_dens_array[iterm][6]
-+
-+            A[iindex, ispin, jindex, jspin, dens_i, dens_s1, dens_j, dens_s2] += dc_coeff_array[iterm]
++add_phonon_terms([[ph.VcX,ph.VcX],[ph.VcY, ph.VcY]],"c","c",-1*ll)
 +
 +
 +A = np.array(A)
@@ -2654,26 +2575,13 @@ index 00000000..9402ed34
 +Percentage4OperatorMove=0.02
 +MeasSusz=1
 diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
-index b7c8d284..f4d415d3 100644
+index b7c8d284..d5707300 100644
 --- a/w2dyn/auxiliaries/config.py
 +++ b/w2dyn/auxiliaries/config.py
-@@ -365,6 +365,23 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
+@@ -365,6 +365,10 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
          return doublecounting.SigZeroBar(ineq_list, lda_dens, atom_list, u_full)
      elif dc_type == 'trace':
          return doublecounting.Trace(ineq_list, lda_dens, atom_list, u_full)
-+    elif dc_type == 'Wterm':
-+        return doublecounting.Wterm(np.array(cfg["General"]["Wterm_U2"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_W"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_V"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_J"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_ll"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_a22"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_a11"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_beta"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_shifts"],dtype=np.double),
-+                                    np.array(cfg["General"]["Wterm_Fock"],dtype=bool),
-+                                    np.array(cfg["General"]["Wterm_legacy"],dtype=bool),
-+                                    ineq_list, lda_dens, atom_list, u_full)
 +    elif dc_type == 'MeanFieldTerms':
 +        return doublecounting.MeanFieldTerms(cfg["General"]["MeanFieldTermsA"],
 +                                             cfg["General"]["MeanFieldTermsB"],
@@ -2682,39 +2590,49 @@ index b7c8d284..f4d415d3 100644
          raise NotImplemented("Unknown double counting scheme")
  
 diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
-index 9c369f03..f0570652 100644
+index 9c369f03..681b543f 100644
 --- a/w2dyn/auxiliaries/configspec
 +++ b/w2dyn/auxiliaries/configspec
-@@ -281,12 +281,31 @@ mu_mixing       = float(default=0.0)            # mix in old chemical potential
- half-bandwidth  = force_list(default=2.)        # half-bandwidth of the DOS
+@@ -272,21 +272,28 @@ GW_KAverage     = integer(default=1)            # Calculation of local GW contri
+ Uw              = integer(default=0)
+ Uw_Mat          = integer(default=0)            # Reading real or Matsubara frequencies from Uw files
+ 
+-EPSOFFDIAG      = float(default=1e-6)           # epsilon for checking off-diagonal Hybridisation elements
+-dos_deltino     = float(default=1e-10)          # deltino for the LDA DOS calculation 
+-eqmaxfreq       = float(default=10.)            # frequency cut-off for equivalence detection
+-beta            = float(default=100.)           # inverse temperature
+-mu              = float(default=0.0)            # chemical potential
+-mu_mixing       = float(default=0.0)            # mix in old chemical potential
+-half-bandwidth  = force_list(default=2.)        # half-bandwidth of the DOS
++EPSOFFDIAG         = float(default=1e-6)           # epsilon for checking off-diagonal Hybridisation elements
++dos_deltino        = float(default=1e-10)          # deltino for the LDA DOS calculation 
++eqmaxfreq          = float(default=10.)            # frequency cut-off for equivalence detection
++beta               = float(default=100.)           # inverse temperature
++mu                 = float(default=0.0)            # chemical potential
++mu_mixing          = float(default=0.0)            # mix in old chemical potential
++half-bandwidth     = force_list(default=2.)        # half-bandwidth of the DOS
  # additional values for LDA+DMFT calculations
- NAt             = integer(default=1)
+-NAt             = integer(default=1)
 -dc              = option_or_list('anisimov','fll','amf','trace','siginfbar','sigzerobar',default='anisimov')
-+dc              = option_or_list('anisimov','fll','MeanFieldTerms','Wterm','amf','trace','siginfbar','sigzerobar',default='anisimov')
- dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
+-dc_mixing       = float(default=0.0)	 	# mixing between old and new SE
+-dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
+-dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals 
+-siw_moments     = option('estimate', 'extract', default='estimate')
+-Neps            = integer(default=1000)         # numerical integration of DOS
++NAt                = integer(default=1)
++dc                 = option_or_list('anisimov','fll','MeanFieldTerms','amf','trace','siginfbar','sigzerobar',default='anisimov')
++dc_mixing          = float(default=0.0)	 	# mixing between old and new SE
 +dc_mixing_strategy = option('linear','diis', default='linear')	 	# mixing between old and new SE
-+dc_subblock     = integer(default=4)            # the d subblock
-+dc_subblock_step = integer(default=1)            # every # the d-block is mixed
-+dc_rest_step = integer(default=5)            # every # the rest is mixed
- dc_dp           = integer(default=0)            # Fixint of energetic distance between d and p orbitals
- dc_dp_orbitals  = int_list(default=None)        # Specify the reference d-orbitals 
- siw_moments     = option('estimate', 'extract', default='estimate')
-+sigma_kick      = float(default=0.0)            # kick in self-energy
-+sigma_kick_persist = integer(default=1)         # for how long should I keep the kick
-+Wterm_U2        = float(default=0.0)
-+Wterm_W         = force_list(default=None)
-+Wterm_V         = float(default=0.0)
-+Wterm_J         = float(default=0.0)
-+Wterm_shifts    = force_list(default=None)
-+Wterm_ll        = float(default=0.0)
-+Wterm_a22       = float(default=0.0)
-+Wterm_a11       = float(default=0.0)
-+Wterm_beta      = float(default=0.0)
-+Wterm_Fock      = boolean(default=True)
-+Wterm_legacy    = boolean(default=False)
- Neps            = integer(default=1000)         # numerical integration of DOS
-+MeanFieldTermsA = string(default=None)
-+MeanFieldTermsB = string(default=None)
++dc_subblock        = integer(default=4)            # the d subblock
++dc_subblock_step   = integer(default=1)            # every # the d-block is mixed
++dc_rest_step       = integer(default=5)            # every # the rest is mixed
++dc_dp              = integer(default=0)            # Fixint of energetic distance between d and p orbitals
++dc_dp_orbitals     = int_list(default=None)        # Specify the reference d-orbitals 
++siw_moments        = option('estimate', 'extract', default='estimate')
++dens_kick_file     = string(default=None)          # kick in density for symmetry breaking
++dens_kick_persist  = integer(default=1)            # for how long should I keep the kick
++Neps               = integer(default=1000)         # numerical integration of DOS
++MeanFieldTermsA    = string(default=None)
  
  # fix mu parameters
  mu_search       = option('nloc', 'kappa', 'curvefit', default='nloc')  # behavior of kappa and curvefit is experimental and may change in later versions
@@ -2852,20 +2770,19 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..9e428dcc 100644
+index 07f954ba..fc22068f 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
-@@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
+@@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
  import numpy as np
  import w2dyn.dmft.orbspin as orbspin
  import w2dyn.dmft.atoms as atoms
 +import sys
-+import w2dyn.dmft.mf_phonons as phonons
 +import w2dyn.auxiliaries.input as inpt
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +227,361 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,49 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -2912,630 +2829,9 @@ index 07f954ba..9e428dcc 100644
 +        return self.dc_value
 +                    
 +
-+class Wterm(SelfConsistent):
-+    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, Fock, legacy, *args, **kwargs):
-+        super().__init__(*args, **kwargs)
-+        self.sav = ShellAveraged(self.shell_av['densities'],
-+                                 self.shell_av['atom_list'],
-+                                 self.shell_av['u_full'])
-+        self.u2 = u2
-+        self.w = w
-+        self.v = v
-+        self.jj = j
-+        self.shifts = shifts
-+        self.ll = ll
-+        self.a22 = a22
-+        self.a11 = a11
-+        self.beta = beta
-+        self.Fock = Fock
-+        self.legacy = legacy
-+        self.do_phonons = False
-+        
-+        if abs(self.ll) > 1e-10:
-+            self.do_phonons = True
-+        
-+    def orbvalley_index_j(self,orbindex,valleyindex,elec_type):
-+        if elec_type=="f":
-+            orbvalley= 2 * valleyindex + orbindex
-+        if elec_type=="c":
-+            orbvalley= 4 + 4 * valleyindex + orbindex + 2
-+        return orbvalley
-+        
-+    def orbvalley_index(self,orbindex,valleyindex,elec_type):
-+        if elec_type=="f":
-+            Norb=2
-+        if elec_type=="c":
-+            Norb=4
-+        orbvalley = 4*(elec_type=="c") + Norb * valleyindex + orbindex
-+        return orbvalley
-+        
-+
-+    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
-+        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
-+            #sys.exit("Fix, we need a proper density matrix")
-+            densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
-+            for iorb in range(12):
-+                for ispin in range(2):
-+                    densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
-+
-+
-+        densities = np.real(densities)
-+        diagonal_densities = orbspin.extract_diagonal(densities)
-+        shifts = np.array(self.shifts)
-+        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins),dtype=complex)
-+        
-+        #################
-+        # Hartree shift #
-+        #################
-+        
-+        print("DC: U1 Hartree shift")
-+        for ispin in range(2):
-+            for iorb in range(0,4):
-+                tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[0]
-+            for iorb in range(4,12):
-+                tmp_dc_full[iorb,ispin,iorb,ispin] += shifts[1]
-+                
-+        #################        
-+        # U2 terms #
-+        #################
-+        
-+        if abs(self.u2) > 1e-10:
-+            print("DC: U2 term")
-+            for ispin in range(2):
-+                for iorb_f in range(4):
-+                    tmp_dc_full[iorb_f,ispin,iorb_f,ispin] +=  6.0 * self.u2 * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-+        
-+        #################        
-+        # W and V terms #
-+        #################
-+        
-+        if self.legacy: #this is the old convention, the one that is not exploding in the loop. This is copypasted from the original "alex" branch. We will eventually need to move away from this
-+            print("DC: legacy. No Fock, no J, no phonons, cc reshuffle, all W are equal to W[0]")
-+            shifts = np.array(self.shifts)
-+            diag_dc = []
-+            for atom in self.atom_list:
-+                nu_corr = np.sum(diagonal_densities[atom.dslice, :] - np.full_like(diagonal_densities, 0.5)[atom.dslice, :])
-+                nu_uncorr = sum(np.sum(diagonal_densities[sl, :] - np.full_like(diagonal_densities, 0.5)[sl, :]) for sl in atom.ligslices)
-+                atslices = [atom.dslice, *atom.ligslices]
-+                atshifts = shifts[:len(atslices)]
-+                for i, shift in enumerate(atshifts):
-+                    if i == 0:
-+                        diag_dc.append(self.w[0] * (nu_uncorr - nu_corr) - self.v * nu_uncorr)
-+                    else:
-+                        diag_dc.append(0.0)
-+                        
-+            #double minus trick
-+            self.sav.from_shell(np.array(diag_dc))
-+            tmp_dc_full += -self.sav.dc_value
-+        
-+        else: #this is the most general expression of the mf-decoupled term, but currently it explodes in the loop. It's split between W and V terms
-+            print("DC: W Hartree term")
-+            #W term 1 (S284)
-+            for ispin in range(2):
-+                for ival_c in range(2):
-+                    for iorb_c in range(4):
-+                        index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-+                        tmp_dc_full[index_c,ispin,index_c,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[slice(0,4,None), :] - np.full_like(diagonal_densities, 0.5)[slice(0,4,None), :])
-+
-+            #W term 2 (S284)
-+            for ispin in range(2):
-+                for iorb_f in range(4):
-+                    for ival_c in range(2):
-+                        for iorb_c in range(4):
-+                            index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-+                            tmp_dc_full[iorb_f,ispin,iorb_f,ispin] += self.w[iorb_c] * np.sum(diagonal_densities[index_c, :] - np.full_like(diagonal_densities, 0.5)[index_c, :])
-+
-+            #W term 3 (S284) This is the Fock term, which for now we don't consider
-+            if self.Fock:
-+                print("DC: W Fock term")
-+                for ispin in range(2):
-+                    for jspin in range(2):
-+                        for iorb_f in range(4):
-+                            for ival_c in range(2):
-+                                for iorb_c in range(4):
-+                                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
-+                                    tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
-+                                    tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
-+
-+        
-+            #V term (S292)
-+            print("DC: V Hartree term")
-+            for ispin in range(2):
-+                for iorb_c in range(4,12):
-+                    tmp_dc_full[iorb_c,ispin,iorb_c,ispin] += self.v * np.sum(diagonal_densities[slice(4,12,None), :] - np.full_like(diagonal_densities, 0.5)[slice(4,12,None), :])   
-+                    
-+        ##########
-+        # J term # 
-+        ##########
-+        
-+        #(S288) of the PRL
-+        
-+        #Here we try in the way we wrote it in the PRX supplementary or equivalently Haoyu's PRL
-+        if not self.legacy:
-+            print("DC: J Hartree term")
-+            
-+            Jmatrix = np.zeros_like(tmp_dc_full)
-+            
-+            #First term of S16 of our PRX
-+            for iorb in range(2):
-+                for jorb in range(2):
-+                    for ival in range(2):
-+                        for jval in range(2):
-+                            for ispin in range(2):
-+                                for jspin in range(2):
-+                                    ival_sign = (-1)**ival #valley 1 is plus valley, valley 2 is minus valley
-+                                    jval_sign = (-1)**jval
-+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) ) #+1 because python indexes start from 0, but it makes no difference
-+                                    
-+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
-+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
-+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
-+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
-+                                                                        
-+                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
-+
-+            #Second term of S16
-+            for iorb in range(2):
-+                for jorb in range(2):
-+                    for ival in range(2):
-+                        for jval in range(2):
-+                            for ispin in range(2):
-+                                for jspin in range(2):
-+                                    ival_sign = (-1)**ival
-+                                    jval_sign = (-1)**jval
-+                                    prefactor = ( ival_sign*jval_sign + (-1)**(iorb+1+jorb+1) )
-+                                    
-+                                    i_f = self.orbvalley_index_j(iorb,ival,"f")
-+                                    j_f = self.orbvalley_index_j(jorb,jval,"f")
-+                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
-+                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
-+                                    
-+                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
-+            
-+            if self.Fock:
-+                print("DC: J Fock term")
-+                #Fock term from (S290) Song-Bernevig
-+                for iorb in range(2):
-+                    for jorb in range(2):
-+                        for ival in range(2):
-+                            for jval in range(2):
-+                                for ispin in range(2):
-+                                    for jspin in range(2):
-+                                        sign_ival = (-1) ** ival
-+                                        sign_jval = (-1) ** jval
-+                                        deltaval = sign_ival * sign_jval  + (-1)**(iorb + 1 + jorb + 1)
-+                                        i_f = self.orbvalley_index_j(iorb,ival,"f")
-+                                        i_c = self.orbvalley_index_j(iorb,ival,"c")
-+                                        j_f = self.orbvalley_index_j(jorb,jval,"f")
-+                                        j_c = self.orbvalley_index_j(jorb,jval,"c")
-+                                        Jmatrix[i_f,ispin,i_c,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
-+                                        Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
-+                
-+            #Sum the J matrix to the DC
-+            tmp_dc_full += Jmatrix
-+            
-+        ################################
-+        # Phonons mean-field decoupled #
-+        ################################
-+        if self.do_phonons and not self.legacy:
-+            print("DC: phonon terms")
-+            ph=phonons.phonon_1bo_params(self.a11,self.beta)
-+            
-+            # f+f terms without density (coming from anticommutators in u_matrix), x and y
-+            for phononterm in [[ph.VfX,ph.VfX],[ph.VfY,ph.VfY]]:
-+                firstop=phonons.onebody_op("f",phononterm[0])
-+                firstop.create_1bo()
-+                secondop=phonons.onebody_op("f",phononterm[1])
-+                secondop.create_1bo()
-+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22**2)
-+                twobodyterm.create_2bo()
-+                twobodyterm.normalorder()
-+                twobodyterm.decouple()
-+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+                for iterm in range(len(dc_coeff_array)):
-+                    if dc_dens_array[iterm][0]=="NODENS":
-+                        # orb1 val1 spin1 type1 orb2 val2 spin2 type2
-+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-+                        ispin  = dc_op_array[iterm][2]
-+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-+                        jspin  = dc_op_array[iterm][6]
-+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-+                        
-+            # f+c terms, x and y
-+            for phononterm in [[ph.VfX,ph.VcX],[ph.VfY,ph.VcY]]:
-+                firstop=phonons.onebody_op("f",phononterm[0])
-+                firstop.create_1bo()
-+                secondop=phonons.onebody_op("c",phononterm[1])
-+                secondop.create_1bo()
-+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll*self.a22)
-+                twobodyterm.create_2bo()
-+                twobodyterm.normalorder()
-+                twobodyterm.decouple()
-+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+                for iterm in range(len(dc_coeff_array)):
-+                    if dc_dens_array[iterm][0]=="NODENS":
-+                        # orb1 val1 spin1 type1 orb2 val2 spin2 type2
-+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-+                        ispin  = dc_op_array[iterm][2]
-+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-+                        jspin  = dc_op_array[iterm][6]
-+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-+                    else:
-+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-+                        ispin  = dc_op_array[iterm][2]
-+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-+                        jspin  = dc_op_array[iterm][6]
-+                        
-+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-+                        dens_ispin  = dc_dens_array[iterm][2]
-+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-+                        dens_jspin  = dc_dens_array[iterm][6]
-+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
-+                            
-+            # c+c terms, x and y
-+            for phononterm in [[ph.VcX,ph.VcX],[ph.VcY,ph.VcY]]:
-+                firstop=phonons.onebody_op("c",phononterm[0])
-+                firstop.create_1bo()
-+                secondop=phonons.onebody_op("c",phononterm[1])
-+                secondop.create_1bo()
-+                twobodyterm=phonons.twobody_op(firstop,secondop,-1*self.ll)
-+                twobodyterm.create_2bo()
-+                twobodyterm.normalorder()
-+                twobodyterm.decouple()
-+                dc_coeff_array,dc_op_array,dc_dens_array = twobodyterm.print_to_dc_decoupled()
-+                for iterm in range(len(dc_coeff_array)):
-+                    if dc_dens_array[iterm][0]=="NODENS":
-+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-+                        ispin  = dc_op_array[iterm][2]
-+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-+                        jspin  = dc_op_array[iterm][6]
-+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm]
-+                    else:
-+                        iindex = self.orbvalley_index(dc_op_array[iterm][0],dc_op_array[iterm][1],dc_op_array[iterm][3])
-+                        ispin  = dc_op_array[iterm][2]
-+                        jindex = self.orbvalley_index(dc_op_array[iterm][4],dc_op_array[iterm][5],dc_op_array[iterm][7])
-+                        jspin  = dc_op_array[iterm][6]
-+                        
-+                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-+                        dens_ispin  = dc_op_array[iterm][2]
-+                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-+                        dens_jspin  = dc_op_array[iterm][6]
-+                        
-+                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
-+        
-+        
-+        ######################
-+        # Sum all and return #
-+        ######################
-+        
-+        if np.any(np.iscomplex(tmp_dc_full)):
-+            sys.exit("DC has finite imaginary part!")
-+        else:
-+            tmp_dc_full=np.real(tmp_dc_full)
-+        
-+        #set numerically small elements to 0
-+        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
-+        
-+        self.dc_value = tmp_dc_full
-+
-+        #here there was a self.sav.from_shell: this promoted the dc array to the diagonal of a matrix, with a minus sign. Then there was another minus sign
-+        #when assigning the return value of this function. We create directly the matrix, so we don't need to add the minus sign to compensate the one coming
-+        #from sav.from_shell
-+        #print("DIAGONAL DC = ",orbspin.extract_diagonal(self.dc_value)[:,0])
-+        return self.dc_value
-+
  class SigZeroBar(SelfConsistent):
      def get(self, siws=None, smoms=None, giws = None, occs = None):
          self.dc_value[...] = 0
-diff --git a/w2dyn/dmft/mf_phonons.py b/w2dyn/dmft/mf_phonons.py
-new file mode 100644
-index 00000000..3ae93414
---- /dev/null
-+++ b/w2dyn/dmft/mf_phonons.py
-@@ -0,0 +1,303 @@
-+import os,sys
-+import numpy as np
-+
-+class phonon_1bo_params:
-+    def __init__(self,alpha,beta):
-+        self.alpha=alpha
-+        self.beta=beta
-+        
-+        #orbital
-+        self.sigma_0 = np.array([[1.0,0.0],[0.0,1.0]])
-+        self.sigma_x = np.array([[0.0,1.0],[1.0,0.0]])
-+        self.sigma_y = np.array([[0.0,-1j],[1j,0.0]])
-+        self.sigma_z = np.array([[1.0,0.0],[0.0,-1.0]])
-+        
-+        #valley
-+        self.tau_0 = np.array([[1.0,0.0],[0.0,1.0]])
-+        self.tau_x = np.array([[0.0,1.0],[1.0,0.0]])
-+        self.tau_y = np.array([[0.0,-1j],[1j,0.0]])
-+        self.tau_z = np.array([[1.0,0.0],[0.0,-1.0]])
-+
-+        #spin
-+        self.s_0 = np.array([[1.0,0.0],[0.0,1.0]])
-+        self.s_x = np.array([[0.0,1.0],[1.0,0.0]])
-+        self.s_y = np.array([[0.0,-1j],[1j,0.0]])
-+        self.s_z = np.array([[1.0,0.0],[0.0,-1.0]])
-+
-+        self.reprMat = np.array([[self.alpha,0.0],[0.0,self.beta]])
-+
-+        self.VfX = np.kron(self.s_0, np.kron(self.tau_x, self.sigma_x))
-+        self.VfY = np.kron(self.s_0, np.kron(self.tau_y, self.sigma_x))
-+        self.VcX = np.kron(self.s_0, np.kron(self.tau_x, np.kron(self.reprMat, self.sigma_x)))
-+        self.VcY = np.kron(self.s_0, np.kron(self.tau_y, np.kron(self.reprMat, self.sigma_x)))
-+
-+class State:                   
-+    def __init__(self, dagger, elec_type, elec_valley, elec_orb, elec_spin):
-+        self.dagger = dagger
-+        self.elec_valley = elec_valley + 1
-+        self.elec_orb    = elec_orb + 1
-+        self.elec_spin   = elec_spin + 1
-+        self.elec_type   = elec_type
-+
-+class onebody_op:
-+    def __init__(self,elec_type,coeff_matrix):
-+        self.elec_type = elec_type
-+        self.op_array = []
-+        self.op_dagger_array = []
-+        self.coeff_matrix = coeff_matrix
-+        self.op_terms = []
-+        if self.elec_type == "f":
-+            for ispin in range(2):
-+                for ival in range(2):
-+                    for iorb in range(2):
-+                        self.op_array.append(State(False,"f",ival,iorb,ispin))
-+                        self.op_dagger_array.append(State(True,"f",ival,iorb,ispin))
-+        else:
-+            for ispin in range(2):
-+                for ival in range(2):
-+                    for iorb in range(4):
-+                        self.op_array.append(State(False,"c",ival,iorb,ispin))
-+                        self.op_dagger_array.append(State(True,"c",ival,iorb,ispin))
-+
-+        
-+    def create_1bo(self):
-+        op_terms=[]
-+        for ii in range(len(self.op_dagger_array)):
-+            for jj in range(len(self.op_array)):
-+                if self.coeff_matrix[ii][jj] != 0:
-+                    op_terms.append([self.coeff_matrix[ii][jj],self.op_dagger_array[ii],self.op_array[jj]])
-+        self.op_terms = op_terms
-+        
-+    def prettyprint(self):
-+        for iterm in range(len(self.op_terms)):
-+            term=self.op_terms[iterm]
-+            coeff=term[0]
-+            op_1=term[1]
-+            op_2=term[2]
-+            if op_1.dagger==True:
-+                suffix1="dg"
-+            else:
-+                suffix1=""
-+            if op_2.dagger==True:
-+                suffix2="dg"
-+            else:
-+                suffix2=""
-+            print(str(coeff) +"  "+ op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
-+                                  + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
-+
-+class twobody_op:
-+    def __init__(self,op_1,op_2,coeff):
-+        self.coeff = coeff
-+        self.op_1 = op_1
-+        self.op_2 = op_2
-+        self.op_terms = []
-+        self.mf_decoupled = []
-+        self.NO_FLAG = False
-+    
-+    def create_2bo(self):
-+        op_terms=[]
-+        for ii in range(len(self.op_1.op_terms)):
-+            firstop = self.op_1.op_terms[ii]
-+            for jj in range(len(self.op_2.op_terms)):
-+                secondop = self.op_2.op_terms[jj]
-+                overall_coeff = self.coeff * firstop[0]*secondop[0]
-+                if overall_coeff != 0:
-+                    op_terms.append([overall_coeff,firstop[1],firstop[2],secondop[1],secondop[2]])
-+        self.op_terms = op_terms
-+        
-+    def normalorder(self):
-+        dummylist=[]
-+        for iterm in range(len(self.op_terms)):
-+            term=self.op_terms[iterm]
-+           
-+            #save components of the term
-+            coeff=term[0]
-+            a=term[1]
-+            b=term[2]
-+            c=term[3]
-+            d=term[4]
-+            if (b.dagger == False) and (c.dagger == True):
-+                pass
-+            else:
-+                print("Either already NO or something wrong")
-+                return
-+            
-+            #is there the mean-field term?
-+            if (b.elec_valley == c.elec_valley) and\
-+            (b.elec_orb == c.elec_orb) and\
-+            (b.elec_spin == c.elec_spin) and\
-+            (b.elec_type == c.elec_type):
-+                dummylist.append([coeff,a,d])    
-+            
-+            #anticommutation adds -1 to the coeff, swap dagger in internal terms
-+            coeff = -1.0*coeff
-+            b.dagger=False
-+            c.dagger=True
-+
-+            #does the 4-operator term survive
-+            if (b.dagger == False) and (d.dagger == False) and\
-+            (b.elec_valley == d.elec_valley) and\
-+            (b.elec_orb == d.elec_orb) and\
-+            (b.elec_spin == d.elec_spin) and\
-+            (b.elec_type == d.elec_type):
-+                pass
-+            elif (a.dagger == True) and (c.dagger == True) and\
-+            (a.elec_valley == c.elec_valley) and\
-+            (a.elec_orb == c.elec_orb) and\
-+            (a.elec_spin == c.elec_spin) and\
-+            (a.elec_type == c.elec_type):
-+                pass
-+            else:
-+                dummylist.append([coeff,a,c,b,d])
-+        
-+    #copyback
-+        self.op_terms=dummylist[:]
-+        self.NO_FLAG=True
-+ 
-+    def decouple(self):
-+        if self.NO_FLAG==False:
-+            print("Operator is not normal ordered")
-+            return
-+        else:
-+            for iterm in range(len(self.op_terms)):
-+                term=self.op_terms[iterm]
-+               
-+                #save components of the term
-+                coeff=term[0]
-+                a=term[1]
-+                b=term[2]
-+                try:
-+                    c=term[3]
-+                    d=term[4]
-+                    
-+                    # -b+d<a+c>
-+                    self.mf_decoupled.append([-1.0*coeff,b,d,a,c])
-+                    # -a+c<b+d>
-+                    self.mf_decoupled.append([-1.0*coeff,a,c,b,d])
-+                    # b+c<a+d>
-+                    self.mf_decoupled.append([coeff,b,c,a,d])
-+                    # a+d<b+c>
-+                    self.mf_decoupled.append([coeff,a,d,b,c])
-+                #except it's already mean-field
-+                except:
-+                    # -a+b
-+                    self.mf_decoupled.append([coeff,a,b])
-+
-+        
-+    
-+    def prettyprint(self):
-+        for iterm in range(len(self.op_terms)):
-+            term=self.op_terms[iterm]
-+            coeff=term[0]
-+            op_1=term[1]
-+            op_2=term[2]
-+            try:
-+                op_3=term[3]
-+                op_4=term[4]
-+                if op_1.dagger==True:
-+                    suffix1="dg"
-+                else:
-+                    suffix1=""
-+                if op_2.dagger==True:
-+                    suffix2="dg"
-+                else:
-+                    suffix2=""
-+                if op_3.dagger==True:
-+                    suffix3="dg"
-+                else:
-+                    suffix3=""
-+                if op_4.dagger==True:
-+                    suffix4="dg"
-+                else:
-+                    suffix4=""
-+                print(str(coeff) +"  "\
-+                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
-+                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin)+" "\
-+                + op_3.elec_type+suffix3+"_"+str(op_3.elec_valley)+"_"+str(op_3.elec_orb)+"_"+str(op_3.elec_spin)+" "\
-+                + op_4.elec_type+suffix4+"_"+str(op_4.elec_valley)+"_"+str(op_4.elec_orb)+"_"+str(op_4.elec_spin))
-+            except:
-+                if op_1.dagger==True:
-+                    suffix1="dg"
-+                else:
-+                    suffix1=""
-+                if op_2.dagger==True:
-+                    suffix2="dg"
-+                else:
-+                    suffix2=""
-+                print(str(coeff) +"  "\
-+                + op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
-+                + op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
-+                
-+    def prettyprint_decoupled(self):
-+        for iterm in range(len(self.mf_decoupled)):
-+            term=self.mf_decoupled[iterm]
-+            coeff=term[0]
-+            op_1=term[1]
-+            op_2=term[2]
-+            #print which is dagger
-+            if op_1.dagger==True:
-+                suffix1="dg"
-+            else:
-+                suffix1=""
-+            if op_2.dagger==True:
-+                suffix2="dg"
-+            else:
-+                suffix2=""
-+            #if there is a density term
-+            try:
-+                dens_1=term[3]
-+                dens_2=term[4]
-+                densStr="dens_"+dens_1.elec_type+"_"+str(dens_1.elec_valley)+"_"+str(dens_1.elec_orb)+"_"+str(dens_1.elec_spin)\
-+                           +"_"+dens_2.elec_type+"_"+str(dens_2.elec_valley)+"_"+str(dens_2.elec_orb)+"_"+str(dens_2.elec_spin)
-+            except:
-+                densStr=""
-+            print(str(coeff) +"  "\
-+            +densStr+"  "
-+            +op_1.elec_type+suffix1+"_"+str(op_1.elec_valley)+"_"+str(op_1.elec_orb)+"_"+str(op_1.elec_spin)+" "\
-+            +op_2.elec_type+suffix2+"_"+str(op_2.elec_valley)+"_"+str(op_2.elec_orb)+"_"+str(op_2.elec_spin))
-+
-+    def print_to_dc_decoupled(self):
-+        self.operator_array_for_dc=[]
-+        self.density_array_for_dc=[]
-+        self.coeff_for_dc=[]
-+        for iterm in range(len(self.mf_decoupled)):
-+            term=self.mf_decoupled[iterm]
-+            
-+            coeff=term[0]
-+            
-+            op_1_type=term[1].elec_type
-+            op_1_valley=term[1].elec_valley -1
-+            op_1_orb=term[1].elec_orb -1
-+            op_1_spin=term[1].elec_spin -1
-+            
-+            op_2_type=term[2].elec_type
-+            op_2_valley=term[2].elec_valley -1
-+            op_2_orb=term[2].elec_orb -1
-+            op_2_spin=term[2].elec_spin -1
-+            
-+            try:
-+                dens_1_type=term[3].elec_type
-+                dens_1_valley=term[3].elec_valley -1
-+                dens_1_orb=term[3].elec_orb -1
-+                dens_1_spin=term[3].elec_spin -1
-+                
-+                dens_2_type=term[4].elec_type
-+                dens_2_valley=term[4].elec_valley -1
-+                dens_2_orb=term[4].elec_orb -1
-+                dens_2_spin=term[4].elec_spin -1
-+                
-+                self.coeff_for_dc.append(coeff)
-+                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
-+                self.density_array_for_dc.append([dens_1_orb, dens_1_valley, dens_1_spin, dens_1_type, dens_2_orb, dens_2_valley, dens_2_spin, dens_2_type])
-+            except:
-+                self.coeff_for_dc.append(coeff)
-+                self.operator_array_for_dc.append([op_1_orb, op_1_valley, op_1_spin, op_1_type, op_2_orb, op_2_valley, op_2_spin, op_2_type])
-+                self.density_array_for_dc.append(["NODENS"])
-+        
-+        
-+        
-+        return self.coeff_for_dc, self.operator_array_for_dc, self.density_array_for_dc
-+
-+
-+
-+
 diff --git a/w2dyn/dmft/mixing.py b/w2dyn/dmft/mixing.py
 index f3b4fe3a..2e7e8f20 100644
 --- a/w2dyn/dmft/mixing.py
@@ -3604,7 +2900,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..6cf37b2c 100644
+index 52b2ddf4..f8ca2445 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -113,7 +113,7 @@ class FrequencyDistribution:
@@ -3612,7 +2908,7 @@ index 52b2ddf4..6cf37b2c 100644
      def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
                   udd_full=None, udp_full=None, upp_full=None, paramag=False,
 -                 siw_mixer=None, mu_mixer=None, mpi_comm=None):
-+                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None, sigma_kick=0.0, sigma_kick_persist=1):
++                 siw_mixer=None, mu_mixer=None, dc_mixer=None, mpi_comm=None, dens_kick_file=None, dens_kick_persist=1):
  
          if beta < 0: raise ValueError("beta must be positive")
          if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
@@ -3628,8 +2924,8 @@ index 52b2ddf4..6cf37b2c 100644
          self.udp_full = udp_full
          self.upp_full = upp_full
          self.paramag = paramag
-+        self.sigma_kick_thresh = sigma_kick
-+        self.sigma_kick_persist = sigma_kick_persist
++        self.dens_kick_file = dens_kick_file
++        self.dens_kick_persist = dens_kick_persist
 +        self.niter_kick = 0
 +        
  
@@ -3643,7 +2939,7 @@ index 52b2ddf4..6cf37b2c 100644
  
          self._eye = lattice.eye
  
-@@ -245,35 +251,66 @@ class DMFTStep:
+@@ -245,35 +251,56 @@ class DMFTStep:
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
  
@@ -3663,28 +2959,18 @@ index 52b2ddf4..6cf37b2c 100644
 +            if new_run:
 +                dens = None
 +            else:
-+                #print("AT LINE 261 SIW IS ",self.siw_full[0,0,0,0])
 +                self.siw2gloc()
 +                dens = self.get_loc_imp_mixdens()
-+                #FIXME: put a kick in the density at the beginning
-+                if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
-+                    print("Adding dc kick for ",self.niter_kick + 1," steps out of ",self.sigma_kick_persist)
++                
++                #put a kick in the density at the beginning, keep it for a number of iterations
++                if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
++                    print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
 +                    if self.niter_kick == 0:
-+                        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
-+                        #itmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
-+                        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
-+                        #if self.mpi_comm is not None:
-+                        #    self.mpi_comm.bcast(tmpmat, root=0)
-+                        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
-+                        np.fill_diagonal(tmpmat,0.0)
-+                        #tmpmat[0:2,8:12]=0.0
-+                        #tmpmat[2:4,4:8]=0.0
-+                        #tmpmat[8:12,0:2]=0.0
-+                        #tmpmat[4:8,2:4]=0.0
-+                        for ispin in range(nspins):
-+                            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
-+                    dens += self.sigma_kick_mat
++                        with open(self.dens_kick_file, "r") as Dfile:
++                            dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
++                    dens += dens_kick_mat
 +                    self.niter_kick += 1    
++                    
 +            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
 +
 +        #set numerically small elements to 0
@@ -3727,7 +3013,7 @@ index 52b2ddf4..6cf37b2c 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -283,9 +320,11 @@ class DMFTStep:
+@@ -283,9 +310,11 @@ class DMFTStep:
              self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
              self.siw_moments += ineq.d_upfold(siw_bl_mom)          
  
@@ -3739,31 +3025,17 @@ index 52b2ddf4..6cf37b2c 100644
  
          # This is an approximation: really, the partial densities and Hartree
          # self-energy an inter-dependent system. Here, we assume that the
-@@ -303,7 +342,23 @@ class DMFTStep:
+@@ -303,7 +332,8 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
+-
 +        
-+        #FIXME:  add kick for phonons, for both siw_full and moments[0], store whether i did it in a self variable
-+        #if self.sigma_kick_thresh and (self.niter_kick < self.sigma_kick_persist):
-+        #    print("Adding sigma kick for ",self.niter_kick," steps out of ",self.sigma_kick_persist)
-+        #    if self.niter_kick == 0:
-+        #        self.sigma_kick_mat = np.zeros([norbitals,nspins,norbitals,nspins])
-+        #        #tmpmat =  np.random.normal(0.0,self.sigma_kick_thresh,[norbitals,norbitals])
-+        #        #tmpmat = 0.5*(tmpmat + np.transpose(tmpmat))
-+        #        tmpmat = self.sigma_kick_thresh*np.ones([norbitals,norbitals])
-+        #        np.fill_diagonal(tmpmat,0.0)
-+        #        for ispin in range(nspins):
-+        #            self.sigma_kick_mat[:,ispin,:,ispin] = np.copy(tmpmat)
-+        #    self.siw_full += self.sigma_kick_mat
-+        #    self.siw_moments[0] += self.sigma_kick_mat  
-+        #    self.niter_kick += 1
- 
-+            
++           
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
          self.densities = None
-@@ -318,17 +373,18 @@ class DMFTStep:
+@@ -318,17 +348,18 @@ class DMFTStep:
      def update_mu(self, target_totdens, epsn, search_range):
          if epsn <= 0: raise ValueError("epsn must be greater than 0")
          if search_range <= 0: raise ValueError("search range must be > 0")
@@ -3785,7 +3057,7 @@ index 52b2ddf4..6cf37b2c 100644
              if self.mpi_comm is not None:
                  totdens = self.mpi_comm.allreduce(totdens)
              totdens += dmodel
-@@ -358,6 +414,15 @@ class DMFTStep:
+@@ -358,6 +389,15 @@ class DMFTStep:
          self.siw_GW_dyn = None
          #self.smom_GW = None
  
