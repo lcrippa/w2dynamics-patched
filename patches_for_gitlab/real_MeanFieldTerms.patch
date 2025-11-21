@@ -1,13 +1,13 @@
 diff --git a/DMFT.py b/DMFT.py
-index f4987b44..b798994f 100755
+index f4987b44..df613677 100755
 --- a/DMFT.py
 +++ b/DMFT.py
 @@ -290,9 +290,31 @@ dc_dp_orbitals = cfg["General"]["dc_dp_orbitals"]
  
  restarted_run = cfg["General"]["readold"]
  
-+sigma_kick = cfg["General"]["sigma_kick"]
-+sigma_kick_persist = cfg["General"]["sigma_kick_persist"]
++dens_kick_file = cfg["General"]["dens_kick_file"]
++dens_kick_persist = cfg["General"]["dens_kick_persist"]
 +
  siw_mixer = mixing.FlatMixingDecorator(
      mixing.LinearMixer(cfg["General"]["mixing"]))
@@ -39,7 +39,7 @@ index f4987b44..b798994f 100755
        beta, mylattice, ineq_list, niw, nftau, dc_dp, dc_dp_orbitals,
        GW, GW_KAverage, natoms, dc, udd_full, udp_full, upp_full,
 -      paramag, siw_mixer, mu_mixer, mpi_comm
-+      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm, sigma_kick ,sigma_kick_persist
++      paramag, siw_mixer, mu_mixer, dc_mixer, mpi_comm, dens_kick_file ,dens_kick_persist
        )
  
  if restarted_run:
