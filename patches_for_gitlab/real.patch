@@ -1298,7 +1298,7 @@ index 9c369f03..f6ff2003 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..b4b88cad 100644
+index 07f954ba..3f39db04 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1599,9 +1599,9 @@ index 07f954ba..b4b88cad 100644
 +                        jspin  = dc_op_array[iterm][6]
 +                        
 +                        dens_iindex = self.orbvalley_index(dc_dens_array[iterm][0],dc_dens_array[iterm][1],dc_dens_array[iterm][3])
-+                        dens_ispin  = dc_op_array[iterm][2]
++                        dens_ispin  = dc_dens_array[iterm][2]
 +                        dens_jindex = self.orbvalley_index(dc_dens_array[iterm][4],dc_dens_array[iterm][5],dc_dens_array[iterm][7])
-+                        dens_jspin  = dc_op_array[iterm][6]
++                        dens_jspin  = dc_dens_array[iterm][6]
 +                        
 +                        tmp_dc_full[iindex,ispin,jindex,jspin] += dc_coeff_array[iterm] * densities[dens_iindex,dens_ispin,dens_jindex,dens_jspin]
 +        
