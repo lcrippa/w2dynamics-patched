@@ -2590,10 +2590,10 @@ index b7c8d284..d5707300 100644
          raise NotImplemented("Unknown double counting scheme")
  
 diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
-index 9c369f03..681b543f 100644
+index 9c369f03..55de2a67 100644
 --- a/w2dyn/auxiliaries/configspec
 +++ b/w2dyn/auxiliaries/configspec
-@@ -272,21 +272,28 @@ GW_KAverage     = integer(default=1)            # Calculation of local GW contri
+@@ -272,21 +272,29 @@ GW_KAverage     = integer(default=1)            # Calculation of local GW contri
  Uw              = integer(default=0)
  Uw_Mat          = integer(default=0)            # Reading real or Matsubara frequencies from Uw files
  
@@ -2632,7 +2632,8 @@ index 9c369f03..681b543f 100644
 +dens_kick_file     = string(default=None)          # kick in density for symmetry breaking
 +dens_kick_persist  = integer(default=1)            # for how long should I keep the kick
 +Neps               = integer(default=1000)         # numerical integration of DOS
-+MeanFieldTermsA    = string(default=None)
++MeanFieldTermsA    = string(default=None)          # Mean-Field terms: density-dependent coefficients
++MeanFieldTermsB    = string(default=None)          # Mean-Field terms: offsets
  
  # fix mu parameters
  mu_search       = option('nloc', 'kappa', 'curvefit', default='nloc')  # behavior of kappa and curvefit is experimental and may change in later versions
