@@ -2512,6 +2512,57 @@ index 00000000..a91c3f0d
 +    twobodyterm.decouple()
 +    print(np.imag(ph.VcY))
 +    #twobodyterm.prettyprint_decoupled()
+diff --git a/blg_utils/symmetry_kick.py b/blg_utils/symmetry_kick.py
+new file mode 100755
+index 00000000..5c5db4db
+--- /dev/null
++++ b/blg_utils/symmetry_kick.py
+@@ -0,0 +1,45 @@
++#!/usr/bin/env python3
++import numpy as np
++import scipy.linalg as lin
++import os,sys
++
++try:
++    broken_symm = sys.argv[1]
++except:
++    broken_symm = 'K-IVC-M2'
++
++
++COEFF = 0.1
++
++sig0 = np.eye(2)
++sigx = np.array([[0,1],[1,0]])
++sigy = np.array([[0,-1j],[1j,0]])
++sigz = np.array([[1,0],[0,-1]])
++
++dm_init = {}
++
++
++if broken_symm == 'K-IVC-M2':
++    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(np.diag([0,0,0,0]),np.diag([1/2,1/2,1/2,1/2]),np.diag([1/2,1/2,1/2,1/2]))
++elif broken_symm == 'K-IVC+VP':
++    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(np.diag([1,0,0,0]), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2]))
++if broken_symm == 'K-IVC-CNP':
++    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(nnp.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++
++NBANDS = np.shape(dm_init['u'])[0]
++
++
++fname="dens_kick.dat"
++f=open(fname,'w')
++f.write(' '.join([str(NBANDS),"BANDS"]))
++f.write("\n")
++for ispin in ['u','d']:
++    for iband in range(NBANDS):
++        for jband in range(NBANDS):
++            value = COEFF * np.real(dm_init[ispin][iband,jband])
++            term = [iband+1,ispin,jband+1,ispin,value]
++            f.write(" ".join(str(x) for x in term) + "\n")
++f.close()
 diff --git a/blg_utils/template_parameters.in b/blg_utils/template_parameters.in
 new file mode 100644
 index 00000000..9402ed34
@@ -2901,10 +2952,18 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..f8ca2445 100644
+index 52b2ddf4..bfa60b99 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
-@@ -113,7 +113,7 @@ class FrequencyDistribution:
+@@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
+ import w2dyn.dmft.orbspin as orbspin
+ import w2dyn.dmft.gw as gw
+ import w2dyn.dmft.mixing as mixing
++import w2dyn.auxiliaries.input as inpt
+ 
+ import w2dyn.auxiliaries.transform as tf
+ 
+@@ -113,7 +114,7 @@ class FrequencyDistribution:
  class DMFTStep:
      def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
                   udd_full=None, udp_full=None, upp_full=None, paramag=False,
@@ -2913,7 +2972,7 @@ index 52b2ddf4..f8ca2445 100644
  
          if beta < 0: raise ValueError("beta must be positive")
          if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
-@@ -121,6 +121,7 @@ class DMFTStep:
+@@ -121,6 +122,7 @@ class DMFTStep:
          if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
          if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
          if mu_mixer is None: mu_mixer = mixing.LinearMixer()
@@ -2921,7 +2980,7 @@ index 52b2ddf4..f8ca2445 100644
  
          self.mpi_comm = mpi_comm
  
-@@ -132,6 +133,10 @@ class DMFTStep:
+@@ -132,6 +134,10 @@ class DMFTStep:
          self.udp_full = udp_full
          self.upp_full = upp_full
          self.paramag = paramag
@@ -2932,7 +2991,7 @@ index 52b2ddf4..f8ca2445 100644
  
          if self.udp_full is None or upp_full is None:
              self.use_hartree = False
-@@ -140,6 +145,7 @@ class DMFTStep:
+@@ -140,6 +146,7 @@ class DMFTStep:
  
          self.siw_mixer = siw_mixer
          self.mu_mixer = mu_mixer
@@ -2940,7 +2999,7 @@ index 52b2ddf4..f8ca2445 100644
  
          self._eye = lattice.eye
  
-@@ -245,35 +251,56 @@ class DMFTStep:
+@@ -245,35 +252,56 @@ class DMFTStep:
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
  
@@ -3014,7 +3073,7 @@ index 52b2ddf4..f8ca2445 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -283,9 +310,11 @@ class DMFTStep:
+@@ -283,9 +311,11 @@ class DMFTStep:
              self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
              self.siw_moments += ineq.d_upfold(siw_bl_mom)          
  
@@ -3026,7 +3085,7 @@ index 52b2ddf4..f8ca2445 100644
  
          # This is an approximation: really, the partial densities and Hartree
          # self-energy an inter-dependent system. Here, we assume that the
-@@ -303,7 +332,8 @@ class DMFTStep:
+@@ -303,7 +333,8 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
@@ -3036,7 +3095,7 @@ index 52b2ddf4..f8ca2445 100644
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
          self.densities = None
-@@ -318,17 +348,18 @@ class DMFTStep:
+@@ -318,17 +349,18 @@ class DMFTStep:
      def update_mu(self, target_totdens, epsn, search_range):
          if epsn <= 0: raise ValueError("epsn must be greater than 0")
          if search_range <= 0: raise ValueError("search range must be > 0")
@@ -3058,7 +3117,7 @@ index 52b2ddf4..f8ca2445 100644
              if self.mpi_comm is not None:
                  totdens = self.mpi_comm.allreduce(totdens)
              totdens += dmodel
-@@ -358,6 +389,15 @@ class DMFTStep:
+@@ -358,6 +390,15 @@ class DMFTStep:
          self.siw_GW_dyn = None
          #self.smom_GW = None
  
