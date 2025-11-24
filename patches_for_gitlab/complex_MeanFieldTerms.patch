@@ -94,7 +94,7 @@ index 11070a55..b4bca14d 100755
              imp_electrons_err = np.sqrt(imp_electrons_err)
 diff --git a/blg_utils/MeanFieldTerms/check.py b/blg_utils/MeanFieldTerms/check.py
 new file mode 100644
-index 00000000..ae4c6c47
+index 00000000..94412608
 --- /dev/null
 +++ b/blg_utils/MeanFieldTerms/check.py
 @@ -0,0 +1,35 @@
@@ -115,7 +115,7 @@ index 00000000..ae4c6c47
 +v = 48.33
 +jj = 16.38
 +shifts = [-202.825, 0]
-+ll = 1.0+1j
++ll = 1.0
 +a22 = 2.0
 +a11 = 3.0
 +beta = 4.0
@@ -859,7 +859,7 @@ index 00000000..2e0e0a55
 +    return dc
 diff --git a/blg_utils/MeanFieldTerms/mean_field_terms.py b/blg_utils/MeanFieldTerms/mean_field_terms.py
 new file mode 100644
-index 00000000..6639a133
+index 00000000..9d1cd8fe
 --- /dev/null
 +++ b/blg_utils/MeanFieldTerms/mean_field_terms.py
 @@ -0,0 +1,251 @@
@@ -879,7 +879,7 @@ index 00000000..6639a133
 +v = 48.33
 +jj = 16.38
 +shifts = [-202.825, 0]
-+ll = 1.0+1j
++ll = 1.0
 +a22 = 2.0
 +a11 = 3.0
 +beta = 4.0
@@ -2757,10 +2757,18 @@ index a6eeeea8..6f12035c 100644
  class RealMixingDecorator(object):
      """
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 3f521730..ae01d165 100644
+index 3f521730..bd8b05ec 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
-@@ -113,7 +113,7 @@ class FrequencyDistribution:
+@@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
+ import w2dyn.dmft.orbspin as orbspin
+ import w2dyn.dmft.gw as gw
+ import w2dyn.dmft.mixing as mixing
++import w2dyn.auxiliaries.input as inpt
+ 
+ import w2dyn.auxiliaries.transform as tf
+ 
+@@ -113,7 +114,7 @@ class FrequencyDistribution:
  class DMFTStep:
      def __init__(self, beta, lattice, ineq_list, niwf, nftau, dc_dp, dc_dp_orbitals, GW, GW_KAverage, natoms, dc=None,
                   udd_full=None, udp_full=None, upp_full=None, paramag=False,
@@ -2769,7 +2777,7 @@ index 3f521730..ae01d165 100644
  
          if beta < 0: raise ValueError("beta must be positive")
          if niwf <= 0 or niwf % 2 != 0: raise ValueError("niwf must be even")
-@@ -121,6 +121,7 @@ class DMFTStep:
+@@ -121,6 +122,7 @@ class DMFTStep:
          if dc is None: dc = doublecounting.Zero(lattice.norbitals, lattice.nspins)
          if siw_mixer is None: siw_mixer = mixing.FlatMixingDecorator(mixing.LinearMixer())
          if mu_mixer is None: mu_mixer = mixing.LinearMixer()
@@ -2777,7 +2785,7 @@ index 3f521730..ae01d165 100644
  
          self.mpi_comm = mpi_comm
  
-@@ -132,6 +133,9 @@ class DMFTStep:
+@@ -132,6 +134,9 @@ class DMFTStep:
          self.udp_full = udp_full
          self.upp_full = upp_full
          self.paramag = paramag
@@ -2787,7 +2795,7 @@ index 3f521730..ae01d165 100644
  
          if self.udp_full is None or upp_full is None:
              self.use_hartree = False
-@@ -140,6 +144,7 @@ class DMFTStep:
+@@ -140,6 +145,7 @@ class DMFTStep:
  
          self.siw_mixer = siw_mixer
          self.mu_mixer = mu_mixer
@@ -2795,7 +2803,7 @@ index 3f521730..ae01d165 100644
  
          self._eye = lattice.eye
  
-@@ -247,36 +252,55 @@ class DMFTStep:
+@@ -247,36 +253,55 @@ class DMFTStep:
              for ineq_no, ineq in enumerate(self.ineq_list):
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
@@ -2870,7 +2878,7 @@ index 3f521730..ae01d165 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -306,6 +330,7 @@ class DMFTStep:
+@@ -306,6 +331,7 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
@@ -2878,7 +2886,7 @@ index 3f521730..ae01d165 100644
  
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
-@@ -360,6 +385,15 @@ class DMFTStep:
+@@ -360,6 +386,15 @@ class DMFTStep:
          # Destroy large GW siw for MC cycle
          self.siw_GW_dyn = None
          #self.smom_GW = None
