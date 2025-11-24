@@ -2757,7 +2757,7 @@ index a6eeeea8..6f12035c 100644
  class RealMixingDecorator(object):
      """
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 3f521730..bd8b05ec 100644
+index 3f521730..e0a79aaa 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -2803,7 +2803,7 @@ index 3f521730..bd8b05ec 100644
  
          self._eye = lattice.eye
  
-@@ -247,36 +253,55 @@ class DMFTStep:
+@@ -247,36 +253,54 @@ class DMFTStep:
              for ineq_no, ineq in enumerate(self.ineq_list):
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
@@ -2831,9 +2831,8 @@ index 3f521730..bd8b05ec 100644
 +                #put a kick in the density at the beginning, keep it for a number of iterations
 +                if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
 +                    print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
-+                    if self.niter_kick == 0:
-+                        with open(self.dens_kick_file, "r") as Dfile:
-+                            dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
++                    with open(self.dens_kick_file, "r") as Dfile:
++                        dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
 +                    dens += dens_kick_mat
 +                    self.niter_kick += 1       
 +            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
@@ -2878,7 +2877,7 @@ index 3f521730..bd8b05ec 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -306,6 +331,7 @@ class DMFTStep:
+@@ -306,6 +330,7 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
@@ -2886,7 +2885,7 @@ index 3f521730..bd8b05ec 100644
  
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
-@@ -360,6 +386,15 @@ class DMFTStep:
+@@ -360,6 +385,15 @@ class DMFTStep:
          # Destroy large GW siw for MC cycle
          self.siw_GW_dyn = None
          #self.smom_GW = None

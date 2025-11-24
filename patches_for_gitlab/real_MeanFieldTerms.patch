@@ -2952,7 +2952,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..bfa60b99 100644
+index 52b2ddf4..8680326e 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -2999,7 +2999,7 @@ index 52b2ddf4..bfa60b99 100644
  
          self._eye = lattice.eye
  
-@@ -245,35 +252,56 @@ class DMFTStep:
+@@ -245,35 +252,55 @@ class DMFTStep:
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
  
@@ -3025,9 +3025,8 @@ index 52b2ddf4..bfa60b99 100644
 +                #put a kick in the density at the beginning, keep it for a number of iterations
 +                if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
 +                    print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
-+                    if self.niter_kick == 0:
-+                        with open(self.dens_kick_file, "r") as Dfile:
-+                            dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
++                    with open(self.dens_kick_file, "r") as Dfile:
++                        dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
 +                    dens += dens_kick_mat
 +                    self.niter_kick += 1    
 +                    
@@ -3073,7 +3072,7 @@ index 52b2ddf4..bfa60b99 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -283,9 +311,11 @@ class DMFTStep:
+@@ -283,9 +310,11 @@ class DMFTStep:
              self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
              self.siw_moments += ineq.d_upfold(siw_bl_mom)          
  
@@ -3085,7 +3084,7 @@ index 52b2ddf4..bfa60b99 100644
  
          # This is an approximation: really, the partial densities and Hartree
          # self-energy an inter-dependent system. Here, we assume that the
-@@ -303,7 +333,8 @@ class DMFTStep:
+@@ -303,7 +332,8 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
@@ -3095,7 +3094,7 @@ index 52b2ddf4..bfa60b99 100644
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
          self.densities = None
-@@ -318,17 +349,18 @@ class DMFTStep:
+@@ -318,17 +348,18 @@ class DMFTStep:
      def update_mu(self, target_totdens, epsn, search_range):
          if epsn <= 0: raise ValueError("epsn must be greater than 0")
          if search_range <= 0: raise ValueError("search range must be > 0")
@@ -3117,7 +3116,7 @@ index 52b2ddf4..bfa60b99 100644
              if self.mpi_comm is not None:
                  totdens = self.mpi_comm.allreduce(totdens)
              totdens += dmodel
-@@ -358,6 +390,15 @@ class DMFTStep:
+@@ -358,6 +389,15 @@ class DMFTStep:
          self.siw_GW_dyn = None
          #self.smom_GW = None
  
