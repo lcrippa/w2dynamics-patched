@@ -2514,14 +2514,22 @@ index 00000000..a91c3f0d
 +    #twobodyterm.prettyprint_decoupled()
 diff --git a/blg_utils/symmetry_kick.py b/blg_utils/symmetry_kick.py
 new file mode 100755
-index 00000000..5c5db4db
+index 00000000..10b87294
 --- /dev/null
 +++ b/blg_utils/symmetry_kick.py
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,73 @@
 +#!/usr/bin/env python3
 +import numpy as np
 +import scipy.linalg as lin
 +import os,sys
++
++
++
++def prettyprint(A):
++    print(" ")
++    for row in A:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++    print(" ")
 +
 +try:
 +    broken_symm = sys.argv[1]
@@ -2529,7 +2537,8 @@ index 00000000..5c5db4db
 +    broken_symm = 'K-IVC-M2'
 +
 +
-+COEFF = 0.1
++COEFF_GLOB = 1.0
++COEFF_DIAG = 0.0
 +
 +sig0 = np.eye(2)
 +sigx = np.array([[0,1],[1,0]])
@@ -2540,29 +2549,48 @@ index 00000000..5c5db4db
 +
 +
 +if broken_symm == 'K-IVC-M2':
-+    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
-+    dm_init['d'] = lin.block_diag(np.diag([0,0,0,0]),np.diag([1/2,1/2,1/2,1/2]),np.diag([1/2,1/2,1/2,1/2]))
++    dm_init['u'] = lin.block_diag(COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]) - 1/2*np.kron(sigy,sigy), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(COEFF_DIAG * np.diag([0,0,0,0]),
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]),
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]))
 +elif broken_symm == 'K-IVC+VP':
-+    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
-+    dm_init['d'] = lin.block_diag(np.diag([1,0,0,0]), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2]))
++    dm_init['u'] = lin.block_diag(COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(COEFF_DIAG * np.diag([1,0,0,0]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]))
 +if broken_symm == 'K-IVC-CNP':
-+    dm_init['u'] = lin.block_diag(np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
-+    dm_init['d'] = lin.block_diag(nnp.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), np.diag([1/2,1/2,1/2,1/2]), np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['u'] = lin.block_diag(COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++    dm_init['d'] = lin.block_diag(COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])-1/2*np.kron(sigy,sigy), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2]), 
++                                  COEFF_DIAG * np.diag([1/2,1/2,1/2,1/2])+0.05*np.kron(sigy,sigy))
++
++
++
++
++prettyprint(dm_init['u'])
++prettyprint(dm_init['d'])
++
 +
 +NBANDS = np.shape(dm_init['u'])[0]
-+
-+
 +fname="dens_kick.dat"
++
 +f=open(fname,'w')
 +f.write(' '.join([str(NBANDS),"BANDS"]))
 +f.write("\n")
 +for ispin in ['u','d']:
 +    for iband in range(NBANDS):
 +        for jband in range(NBANDS):
-+            value = COEFF * np.real(dm_init[ispin][iband,jband])
++            value = COEFF_GLOB * np.real(dm_init[ispin][iband,jband])
 +            term = [iband+1,ispin,jband+1,ispin,value]
 +            f.write(" ".join(str(x) for x in term) + "\n")
 +f.close()
++
 diff --git a/blg_utils/template_parameters.in b/blg_utils/template_parameters.in
 new file mode 100644
 index 00000000..9402ed34
@@ -2626,25 +2654,26 @@ index 00000000..9402ed34
 +Percentage4OperatorMove=0.02
 +MeasSusz=1
 diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
-index b7c8d284..d5707300 100644
+index b7c8d284..c440b7b9 100644
 --- a/w2dyn/auxiliaries/config.py
 +++ b/w2dyn/auxiliaries/config.py
-@@ -365,6 +365,10 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
+@@ -365,6 +365,11 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
          return doublecounting.SigZeroBar(ineq_list, lda_dens, atom_list, u_full)
      elif dc_type == 'trace':
          return doublecounting.Trace(ineq_list, lda_dens, atom_list, u_full)
 +    elif dc_type == 'MeanFieldTerms':
 +        return doublecounting.MeanFieldTerms(cfg["General"]["MeanFieldTermsA"],
 +                                             cfg["General"]["MeanFieldTermsB"],
++                                             cfg["General"]["MeanFieldRotationMatrix"],
 +                                             ineq_list, lda_dens, atom_list, u_full)
      else:
          raise NotImplemented("Unknown double counting scheme")
  
 diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
-index 9c369f03..55de2a67 100644
+index 9c369f03..7ffff0c1 100644
 --- a/w2dyn/auxiliaries/configspec
 +++ b/w2dyn/auxiliaries/configspec
-@@ -272,21 +272,29 @@ GW_KAverage     = integer(default=1)            # Calculation of local GW contri
+@@ -272,21 +272,30 @@ GW_KAverage     = integer(default=1)            # Calculation of local GW contri
  Uw              = integer(default=0)
  Uw_Mat          = integer(default=0)            # Reading real or Matsubara frequencies from Uw files
  
@@ -2685,6 +2714,7 @@ index 9c369f03..55de2a67 100644
 +Neps               = integer(default=1000)         # numerical integration of DOS
 +MeanFieldTermsA    = string(default=None)          # Mean-Field terms: density-dependent coefficients
 +MeanFieldTermsB    = string(default=None)          # Mean-Field terms: offsets
++MeanFieldRotationMatrix   = string(default=None)   # Mean-Field terms: rotation matrix
  
  # fix mu parameters
  mu_search       = option('nloc', 'kappa', 'curvefit', default='nloc')  # behavior of kappa and curvefit is experimental and may change in later versions
@@ -2822,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..fc22068f 100644
+index 07f954ba..c7fd3f0f 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -2834,7 +2864,7 @@ index 07f954ba..fc22068f 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,49 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,90 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -2844,18 +2874,51 @@ index 07f954ba..fc22068f 100644
 +    This returns a mean-field term given two matrices A and B that looks like
 +    A*density_matrix +  B
 +    """
-+    def __init__(self, Afile, Bfile, *args, **kwargs):
++    def __init__(self, Afile, Bfile, Rotfile, *args, **kwargs):
 +        super().__init__(*args, **kwargs)
 +        self.sav = ShellAveraged(self.shell_av['densities'],
 +                                 self.shell_av['atom_list'],
 +                                 self.shell_av['u_full'])
 +        self.Afile = Afile
 +        self.Bfile = Bfile
++        self.Rotfile = Rotfile
++        if self.Rotfile is not None:
++            with open(self.Rotfile, "r") as Rotread:
++                self.RotMat = inpt.read_mean_field_file(RotRead)
 +        
 +        with open(self.Afile, "r") as Aread:
 +            self.A = inpt.read_u_matrix(Aread,spin=True)
 +        with open(self.Bfile, "r") as Bread:
 +            self.B = inpt.read_mean_field_file(Bread)
++
++    def rotate_to_bandbasis(self, mat):
++        """
++        Rotate a (a,2,a,2) matrix to the band basis using self.RotMat
++        of shape (a,2,a,2).
++        """
++        norb = mat.shape[0]
++        nspin = mat.shape[1]
++        
++        mat2 = mat.reshape(norb*nspin, norb*nspin)
++        rotmat = self.RotMat.reshape(norb*nspin, norb*nspin)
++        
++        mat2_t = np.linalg.inv(rotmat) @ mat2 @ rotmat
++        
++        return mat2_t.reshape(mat.shape)
++        
++    def rotate_to_orbbasis(self, mat):
++        """
++        Rotate a (a,2,a,2) matrix back to the orbital basis.
++        """
++        norb = mat.shape[0]
++        nspin = mat.shape[1]
++        
++        mat2 = mat.reshape(norb*nspin, norb*nspin)
++        rotmat = self.RotMat.reshape(norb*nspin, norb*nspin)
++        
++        mat2_t = rotmat @ mat2 @ np.linalg.inv(rotmat)
++        
++        return mat2_t.reshape(mat.shape)
 +                      
 +    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
 +        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
@@ -2864,10 +2927,18 @@ index 07f954ba..fc22068f 100644
 +            for iorb in range(12):
 +                for ispin in range(2):
 +                    densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
-+
++        
++        if self.Rotfile is not None:
++            #Rotate the density to the original basis for DC calculation
++            densities = self.rotate_to_orbbasis(densities)
++        
 +        densities = np.real(densities)
 +        
 +        tmp_dc_full = np.einsum('ijklabcd,abcd->ijkl', self.A, densities) + self.B
++        
++        if self.Rotfile is not None:
++        #rotate the DC back to the solver basis
++            tmp_dc_full = self.rotate_to_bandbasis(tmp_dc_full)
 +       
 +        if np.any(np.iscomplex(tmp_dc_full)):
 +            sys.exit("DC has finite imaginary part!")

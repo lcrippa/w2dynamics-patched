@@ -2528,7 +2528,7 @@ index 83f03fe9..d62d737d 100644
  
  def read_epsk_vk_file(epsk_file, vk_file, norbitals):
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 94059d71..0a185121 100644
+index 94059d71..c9655416 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
@@ -2559,7 +2559,7 @@ index 94059d71..0a185121 100644
          dc_shell = self.ubar.dot(self.dens_sum) - self.jbar.dot(self.dens_sum/2)
          for I in range(self.nshells):
              dc_shell[I] -= self.ubar[I, I] * self.dens_mean[I]
-@@ -223,6 +226,96 @@ class SelfConsistent(DoubleCounting):
+@@ -223,6 +226,98 @@ class SelfConsistent(DoubleCounting):
          self.d_dens_sum = np.array([densities[sl].sum() for sl in self.d_slices])
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
@@ -2589,30 +2589,32 @@ index 94059d71..0a185121 100644
 +                
 +    def rotate_to_bandbasis(self, mat):
 +        """
-+        Rotate a (a,2,a,2) matrix to the band basis using self.rotationmatrix
++        Rotate a (a,2,a,2) matrix to the band basis using self.RotMat
 +        of shape (a,2,a,2).
 +        """
-+        # combined rotation: sum over first two axes and last two axes
-+        mat_t = np.einsum('ia,jb,ijkl,kc,ld->abcd',
-+                          np.linalg.inv(self.rotationmatrix).reshape(-1, -1),
-+                          mat.reshape(-1, -1),
-+                          self.rotationmatrix.reshape(-1, -1),
-+                          optimize='optimal')
++        norb = mat.shape[0]
++        nspin = mat.shape[1]
 +        
-+        # reshape back to (a,2,a,2)
-+        return mat_t.reshape(mat.shape)
++        mat2 = mat.reshape(norb*nspin, norb*nspin)
++        rotmat = self.RotMat.reshape(norb*nspin, norb*nspin)
++        
++        mat2_t = np.linalg.inv(rotmat) @ mat2 @ rotmat
++        
++        return mat2_t.reshape(mat.shape)
 +        
 +    def rotate_to_orbbasis(self, mat):
 +        """
 +        Rotate a (a,2,a,2) matrix back to the orbital basis.
 +        """
-+        mat_t = np.einsum('ia,jb,ijkl,kc,ld->abcd',
-+                          self.rotationmatrix.reshape(-1, -1),
-+                          mat.reshape(-1, -1),
-+                          np.linalg.inv(self.rotationmatrix).reshape(-1, -1),
-+                          optimize='optimal')
++        norb = mat.shape[0]
++        nspin = mat.shape[1]
 +        
-+        return mat_t.reshape(mat.shape)
++        mat2 = mat.reshape(norb*nspin, norb*nspin)
++        rotmat = self.RotMat.reshape(norb*nspin, norb*nspin)
++        
++        mat2_t = rotmat @ mat2 @ np.linalg.inv(rotmat)
++        
++        return mat2_t.reshape(mat.shape)
 +                          
 +    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
 +        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
@@ -2656,7 +2658,7 @@ index 94059d71..0a185121 100644
  
  class SigZeroBar(SelfConsistent):
      def get(self, siws=None, smoms=None, giws = None, occs = None):
-@@ -231,10 +324,10 @@ class SigZeroBar(SelfConsistent):
+@@ -231,10 +326,10 @@ class SigZeroBar(SelfConsistent):
              return self.dc_value
          for ineq, siw in zip(self.ineq_list, siws):
              niw = siw.shape[0]
@@ -2671,7 +2673,7 @@ index 94059d71..0a185121 100644
  
              szerobar = szero.trace(0,1,3).trace().real
              szerobar /= ineq.nd * self.nspins
-@@ -248,7 +341,7 @@ class SigInfBar(SelfConsistent):
+@@ -248,7 +343,7 @@ class SigInfBar(SelfConsistent):
          self.dc_value[...] = 0
          if smoms is None:
              return self.dc_value
@@ -2680,7 +2682,7 @@ index 94059d71..0a185121 100644
          for ineq, smom in zip(self.ineq_list, smoms):
              sinf = smom[0]     # 0-th moment
              sinfbar = sinf.trace(0,1,3).trace()
-@@ -299,7 +392,7 @@ class Trace(SelfConsistent):
+@@ -299,7 +394,7 @@ class Trace(SelfConsistent):
                  dens0_impurity = ineq.occ_dc_number
              else:
                  dens0_impurity = occ0
