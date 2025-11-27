@@ -2528,7 +2528,7 @@ index 83f03fe9..d62d737d 100644
  
  def read_epsk_vk_file(epsk_file, vk_file, norbitals):
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 94059d71..c9655416 100644
+index 94059d71..78351d07 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
@@ -2584,7 +2584,7 @@ index 94059d71..c9655416 100644
 +        with open(self.Bfile, "r") as Bread:
 +            self.B = inpt.read_mean_field_file(Bread)
 +        if self.Rotfile is not None:
-+            with open(self.Rotfile, "r") as Rotread:
++            with open(self.Rotfile, "r") as RotRead:
 +                self.RotMat = inpt.read_mean_field_file(RotRead)
 +                
 +    def rotate_to_bandbasis(self, mat):

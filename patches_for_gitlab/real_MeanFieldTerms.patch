@@ -2852,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..c7fd3f0f 100644
+index 07f954ba..195364c1 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -2883,7 +2883,7 @@ index 07f954ba..c7fd3f0f 100644
 +        self.Bfile = Bfile
 +        self.Rotfile = Rotfile
 +        if self.Rotfile is not None:
-+            with open(self.Rotfile, "r") as Rotread:
++            with open(self.Rotfile, "r") as RotRead:
 +                self.RotMat = inpt.read_mean_field_file(RotRead)
 +        
 +        with open(self.Afile, "r") as Aread:
