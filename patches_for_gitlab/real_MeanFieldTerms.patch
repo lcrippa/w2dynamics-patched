@@ -2852,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..f9a48791 100644
+index 07f954ba..bc783885 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -2936,6 +2936,9 @@ index 07f954ba..f9a48791 100644
 +        self.kick = kick
 +        
 +        tmp_dc_full = np.einsum('ijklabcd,abcd->ijkl', self.A, densities) + self.B
++
++        if self.kick is not None:
++            tmp_dc_full += self.kick
 +        
 +        if self.Rotfile is not None:
 +        #rotate the DC back to the solver basis
@@ -2947,10 +2950,7 @@ index 07f954ba..f9a48791 100644
 +            tmp_dc_full=np.real(tmp_dc_full)
 +        
 +        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
-+        
-+        if self.kick is not None:
-+            tmp_dc_full += self.kick
-+        
++                
 +        self.dc_value = tmp_dc_full
 +        
 +        return self.dc_value
