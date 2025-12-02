@@ -2852,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..195364c1 100644
+index 07f954ba..f9a48791 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -2864,7 +2864,7 @@ index 07f954ba..195364c1 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,90 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,94 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -2920,7 +2920,7 @@ index 07f954ba..195364c1 100644
 +        
 +        return mat2_t.reshape(mat.shape)
 +                      
-+    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
++    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None, kick=None):
 +        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
 +            #sys.exit("Fix, we need a proper density matrix")
 +            densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
@@ -2933,6 +2933,7 @@ index 07f954ba..195364c1 100644
 +            densities = self.rotate_to_orbbasis(densities)
 +        
 +        densities = np.real(densities)
++        self.kick = kick
 +        
 +        tmp_dc_full = np.einsum('ijklabcd,abcd->ijkl', self.A, densities) + self.B
 +        
@@ -2946,6 +2947,9 @@ index 07f954ba..195364c1 100644
 +            tmp_dc_full=np.real(tmp_dc_full)
 +        
 +        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
++        
++        if self.kick is not None:
++            tmp_dc_full += self.kick
 +        
 +        self.dc_value = tmp_dc_full
 +        
@@ -3023,7 +3027,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..8680326e 100644
+index 52b2ddf4..1f7202de 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -3070,7 +3074,7 @@ index 52b2ddf4..8680326e 100644
  
          self._eye = lattice.eye
  
-@@ -245,35 +252,55 @@ class DMFTStep:
+@@ -245,35 +252,56 @@ class DMFTStep:
                  siw_dd[ineq_no][:] += ineq.d_downfold(self.sigma_hartree)
                  ineq.d_setpart(self.sigma_hartree, 0)
  
@@ -3098,10 +3102,11 @@ index 52b2ddf4..8680326e 100644
 +                    print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
 +                    with open(self.dens_kick_file, "r") as Dfile:
 +                        dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
-+                    dens += dens_kick_mat
 +                    self.niter_kick += 1    
++                else:
++                    dens_kick_mat = None
 +                    
-+            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
++            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens, kick=dens_kick_mat)
 +
 +        #set numerically small elements to 0
 +        self.dc_full[abs(self.dc_full) < 1e-10] = 0
@@ -3143,7 +3148,7 @@ index 52b2ddf4..8680326e 100644
          for ineq, siw_bl, siw_bl_mom in zip(self.ineq_list, self.siw_dd,
                                              self.smom_dd):
              # Here, we potentially encounter a memory problem (a set of
-@@ -283,9 +310,11 @@ class DMFTStep:
+@@ -283,9 +311,11 @@ class DMFTStep:
              self.siw_full += ineq.d_upfold(siw_bl[self.my_slice])
              self.siw_moments += ineq.d_upfold(siw_bl_mom)          
  
@@ -3155,7 +3160,7 @@ index 52b2ddf4..8680326e 100644
  
          # This is an approximation: really, the partial densities and Hartree
          # self-energy an inter-dependent system. Here, we assume that the
-@@ -303,7 +332,8 @@ class DMFTStep:
+@@ -303,7 +333,8 @@ class DMFTStep:
  
          self.siw_full += self.sigma_hartree
          self.siw_moments[0] += self.sigma_hartree.real
@@ -3165,7 +3170,7 @@ index 52b2ddf4..8680326e 100644
          # Invalidate lattice quantities (call to siw2gloc necessary)
          self.glociw = None
          self.densities = None
-@@ -318,17 +348,18 @@ class DMFTStep:
+@@ -318,17 +349,18 @@ class DMFTStep:
      def update_mu(self, target_totdens, epsn, search_range):
          if epsn <= 0: raise ValueError("epsn must be greater than 0")
          if search_range <= 0: raise ValueError("search range must be > 0")
@@ -3187,7 +3192,7 @@ index 52b2ddf4..8680326e 100644
              if self.mpi_comm is not None:
                  totdens = self.mpi_comm.allreduce(totdens)
              totdens += dmodel
-@@ -358,6 +389,15 @@ class DMFTStep:
+@@ -358,6 +390,15 @@ class DMFTStep:
          self.siw_GW_dyn = None
          #self.smom_GW = None
  
