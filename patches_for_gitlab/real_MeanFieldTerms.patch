@@ -3023,7 +3023,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..6b57c73f 100644
+index 52b2ddf4..f923793a 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -3096,14 +3096,6 @@ index 52b2ddf4..6b57c73f 100644
 +                    
 +            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens, kick=dens_kick_mat)
 +
-+        #put a kick in the density at the beginning, keep it for a number of iterations
-+        if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
-+            print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
-+            with open(self.dens_kick_file, "r") as Dfile:
-+                dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
-+            self.dc_full += dens_kick_mat
-+            self.niter_kick += 1    
-+
 +        #set numerically small elements to 0
 +        self.dc_full[abs(self.dc_full) < 1e-10] = 0
 +
@@ -3119,6 +3111,14 @@ index 52b2ddf4..6b57c73f 100644
 +        # Experimental doublecounting mixing
 +        if mix:
 +            self.dc_full = self.dc_mixer(self.dc_full)
++            
++        #put a kick in the density at the beginning, keep it for a number of iterations
++        if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
++            print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
++            with open(self.dens_kick_file, "r") as Dfile:
++                dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
++            self.dc_full += dens_kick_mat
++            self.niter_kick += 1    
 +        
          # Fix the distance between selected d-orbitals and the p-manifold to the original distance of the LDA/GW Hamiltonian
          if self.dc_dp == 1:
