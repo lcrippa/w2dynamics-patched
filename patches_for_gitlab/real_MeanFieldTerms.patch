@@ -3023,7 +3023,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..f923793a 100644
+index 52b2ddf4..24870e6d 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -3094,7 +3094,7 @@ index 52b2ddf4..f923793a 100644
 +                dens = self.get_loc_imp_mixdens()
 +
 +                    
-+            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens, kick=dens_kick_mat)
++            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens)
 +
 +        #set numerically small elements to 0
 +        self.dc_full[abs(self.dc_full) < 1e-10] = 0
