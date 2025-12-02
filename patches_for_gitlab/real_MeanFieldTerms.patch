@@ -2852,7 +2852,7 @@ index 579e5174..ad1c857a 100644
      r"""Reads an epsk and a vk file.
  
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..7d22fd47 100644
+index 07f954ba..eef47896 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -2864,7 +2864,7 @@ index 07f954ba..7d22fd47 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,94 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,90 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -2920,7 +2920,7 @@ index 07f954ba..7d22fd47 100644
 +        
 +        return mat2_t.reshape(mat.shape)
 +                      
-+    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None, kick=None):
++    def get(self, siws=None, smoms=None, giws=None, occs=None, densities=None):
 +        if densities is None: #This just sets up a diagonal density matrix if none is provided. Shouldn't be needed
 +            #sys.exit("Fix, we need a proper density matrix")
 +            densities = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
@@ -2933,16 +2933,12 @@ index 07f954ba..7d22fd47 100644
 +            densities = self.rotate_to_orbbasis(densities)
 +        
 +        densities = np.real(densities)
-+        self.kick = kick
 +        
 +        tmp_dc_full = np.einsum('ijklabcd,abcd->ijkl', self.A, densities) + self.B
 +        
 +        if self.Rotfile is not None:
 +        #rotate the DC back to the solver basis
 +            tmp_dc_full = self.rotate_to_bandbasis(tmp_dc_full)
-+ 
-+        if self.kick is not None:
-+            tmp_dc_full += self.kick 
 + 
 +        if np.any(np.iscomplex(tmp_dc_full)):
 +            sys.exit("DC has finite imaginary part!")
@@ -3027,7 +3023,7 @@ index f3b4fe3a..2e7e8f20 100644
      """
      This mixing decorator takes an array or list as input and concatenates its
 diff --git a/w2dyn/dmft/selfcons.py b/w2dyn/dmft/selfcons.py
-index 52b2ddf4..1f7202de 100644
+index 52b2ddf4..6b57c73f 100644
 --- a/w2dyn/dmft/selfcons.py
 +++ b/w2dyn/dmft/selfcons.py
 @@ -11,6 +11,7 @@ import w2dyn.dmft.doublecounting as doublecounting
@@ -3096,17 +3092,17 @@ index 52b2ddf4..1f7202de 100644
 +            else:
 +                self.siw2gloc()
 +                dens = self.get_loc_imp_mixdens()
-+                
-+                #put a kick in the density at the beginning, keep it for a number of iterations
-+                if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
-+                    print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
-+                    with open(self.dens_kick_file, "r") as Dfile:
-+                        dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
-+                    self.niter_kick += 1    
-+                else:
-+                    dens_kick_mat = None
++
 +                    
 +            self.dc_full = self.dc.get(siws=siw_dd, smoms=smom_dd, giws=giws, densities=dens, kick=dens_kick_mat)
++
++        #put a kick in the density at the beginning, keep it for a number of iterations
++        if self.dens_kick_file is not None and (self.niter_kick < self.dens_kick_persist):
++            print("Adding density kick for ",self.niter_kick + 1," steps out of ",self.dens_kick_persist)
++            with open(self.dens_kick_file, "r") as Dfile:
++                dens_kick_mat = inpt.read_mean_field_file(Dfile)                    
++            self.dc_full += dens_kick_mat
++            self.niter_kick += 1    
 +
 +        #set numerically small elements to 0
 +        self.dc_full[abs(self.dc_full) < 1e-10] = 0
