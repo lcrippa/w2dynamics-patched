@@ -519,7 +519,7 @@ index 00000000..3abed88b
 +                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
 +                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
 +                                                                        
-+                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
++                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * (-self.jj) * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
 +
 +            #Second term of S16
 +            for iorb in range(2):
@@ -537,7 +537,7 @@ index 00000000..3abed88b
 +                                    i_c = self.orbvalley_index_j(iorb,ival,"c")
 +                                    j_c = self.orbvalley_index_j(jorb,jval,"c")
 +                                    
-+                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
++                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * (-self.jj) * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
 +            
 +            if self.Fock:
 +                print("DC: J Fock term")
@@ -1019,11 +1019,11 @@ index 00000000..e8029644
 +                        j_c = orbvalley_index_j(jorb, jval, "c")
 +                        
 +                        # linear
-+                        A[i_f, ispin, j_f, jspin, j_c, jspin, i_c, ispin] += 0.5 * jj * prefactor
++                        A[i_f, ispin, j_f, jspin, j_c, jspin, i_c, ispin] += 0.5 * (-jj) * prefactor
 +                        
 +                        # constant
 +                        if (ispin == jspin) and (i_c == j_c):
-+                            B[i_f, ispin, j_f, jspin] += -0.25 * jj * prefactor
++                            B[i_f, ispin, j_f, jspin] += -0.25 * (-jj) * prefactor
 +                            
 +#Second term
 +for iorb in range(2):
@@ -1041,11 +1041,11 @@ index 00000000..e8029644
 +                        j_c = orbvalley_index_j(jorb, jval, "c")
 +                        
 +                        # linear
-+                        A[i_c, ispin, j_c, jspin, j_f, jspin, i_f, ispin] += 0.5 * jj * prefactor
++                        A[i_c, ispin, j_c, jspin, j_f, jspin, i_f, ispin] += 0.5 * (-jj) * prefactor
 +                        
 +                        # constant
 +                        if (ispin == jspin) and (i_f == j_f):
-+                            B[i_c, ispin, j_c, jspin] += -0.25 * jj * prefactor
++                            B[i_c, ispin, j_c, jspin] += -0.25 * (-jj) * prefactor
 +
 +                            
 +print("DC: J Fock term")

@@ -429,7 +429,7 @@ class Wterm(SelfConsistent):
                                     i_c = self.orbvalley_index_j(iorb,ival,"c")
                                     j_c = self.orbvalley_index_j(jorb,jval,"c")
                                                                         
-                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * self.jj * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
+                                    Jmatrix[i_f,ispin,j_f,jspin] += 0.5 * (-self.jj) * prefactor * (densities[j_c,jspin,i_c,ispin] - 0.5 * ((ispin == jspin) and (i_c == j_c)) )
 
             #Second term of S16
             for iorb in range(2):
@@ -447,7 +447,7 @@ class Wterm(SelfConsistent):
                                     i_c = self.orbvalley_index_j(iorb,ival,"c")
                                     j_c = self.orbvalley_index_j(jorb,jval,"c")
                                     
-                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * self.jj * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
+                                    Jmatrix[i_c,ispin,j_c,jspin] += 0.5 * (-self.jj) * prefactor * (densities[j_f,jspin,i_f,ispin] - 0.5 * ((ispin==jspin) and (i_f == j_f)) )
 
             #########################################
             ## THE FOCK TERM                       ##
