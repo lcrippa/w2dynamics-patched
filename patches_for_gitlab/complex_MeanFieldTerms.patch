@@ -981,7 +981,7 @@ index 00000000..9d1cd8fe
 +                for iorb_c in range(4):
 +                    index_c = orbvalley_index(iorb_c, ival_c, "c")
 +                    A[iorb_f, ispin, index_c, jspin, index_c, jspin, iorb_f, ispin] += -w[iorb_c]
-+                    A[index_c, jspin, iorb_f, ispin, index_c, jspin, iorb_f, ispin] += -w[iorb_c]
++                    A[index_c, jspin, iorb_f, ispin, iorb_f, ispin, index_c, jspin] += -w[iorb_c]
 +                    
 +print("DC: V Hartree term")
 +for ispin in range(2):
@@ -1060,7 +1060,7 @@ index 00000000..9d1cd8fe
 +                        j_c = orbvalley_index_j(jorb, jval, "c")
 +                        
 +                        A[i_f, ispin, i_c, ispin, j_c, jspin, j_f, jspin] += 0.5 * jj * deltaval
-+                        A[i_c, ispin, i_f, ispin, j_c, jspin, j_f, jspin] += 0.5 * jj * deltaval
++                        A[i_c, jspin, i_f, jspin, j_f, ispin, j_c, ispin] += 0.5 * jj * deltaval
 +                        
 +                        
 +

@@ -1219,7 +1219,7 @@ index 94059d71..044c14da 100644
 +                                for iorb_c in range(4):
 +                                    index_c = self.orbvalley_index(iorb_c,ival_c,"c")
 +                                    tmp_dc_full[iorb_f,ispin,index_c,jspin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
-+                                    tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[index_c,jspin,iorb_f,ispin]
++                                    tmp_dc_full[index_c,jspin,iorb_f,ispin] += -1.0 * self.w[iorb_c] * densities[iorb_f,ispin,index_c,jspin]
 +
 +        
 +            #V term (S292)
@@ -1293,7 +1293,7 @@ index 94059d71..044c14da 100644
 +                                        j_f = self.orbvalley_index_j(jorb,jval,"f")
 +                                        j_c = self.orbvalley_index_j(jorb,jval,"c")
 +                                        Jmatrix[i_f,ispin,i_c,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
-+                                        Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_c,jspin,j_f,jspin]
++                                        Jmatrix[i_c,ispin,i_f,ispin] += 0.5 * self.jj * deltaval * densities[j_f,jspin,j_c,jspin]
 +                
 +            #Sum the J matrix to the DC
 +            tmp_dc_full += Jmatrix
