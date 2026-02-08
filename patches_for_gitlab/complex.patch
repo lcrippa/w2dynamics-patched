@@ -1023,7 +1023,7 @@ index c3441591..7cc8929b 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 94059d71..044c14da 100644
+index 94059d71..90f01177 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
@@ -1054,7 +1054,7 @@ index 94059d71..044c14da 100644
          dc_shell = self.ubar.dot(self.dens_sum) - self.jbar.dot(self.dens_sum/2)
          for I in range(self.nshells):
              dc_shell[I] -= self.ubar[I, I] * self.dens_mean[I]
-@@ -224,6 +227,367 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +227,381 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -1094,6 +1094,12 @@ index 94059d71..044c14da 100644
 +        else:
 +            print("Setting rotation matrix to identity")
 +            self.rotationmatrix = np.eye(24)
++            
++        print("      ")
++        print("Rotation matrix")
++        for row in self.rotationmatrix:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++        print("      ")
 +
 +    def rotate_to_bandbasis(self, mat):
 +        mat_t = mat.transpose(1, 0, 3, 2)
@@ -1142,6 +1148,9 @@ index 94059d71..044c14da 100644
 +        #rotate to orbital basis: this DC works in the original basis!
 +
 +        densities = self.rotate_to_orbbasis(densities)
++        densities = densities.reshape(24, 24)
++        densities = 0.5*(densities + densities.conj().T)
++        densities = densities.reshape(12, 2, 12, 2)
 +
 +        #densities = np.real(densities)
 +        diagonal_densities = orbspin.extract_diagonal(densities)
@@ -1409,7 +1418,12 @@ index 94059d71..044c14da 100644
 +
 +       
 +        #set numerically small elements to 0
-+        tmp_dc_full[abs(tmp_dc_full) < 1e-10] = 0
++        tmp_dc_full.real[np.abs(tmp_dc_full.real) < 1e-8] = 0.0
++        tmp_dc_full.imag[np.abs(tmp_dc_full.imag) < 1e-8] = 0.0
++        
++        D = tmp_dc_full.reshape(24, 24)
++        if not np.allclose(D, D.conj().T, atol=1e-8):
++            raise ValueError("Matrix is not Hermitian within tolerance 1e-8")
 +        
 +        self.dc_value = tmp_dc_full
 +
@@ -1422,7 +1436,7 @@ index 94059d71..044c14da 100644
  class SigZeroBar(SelfConsistent):
      def get(self, siws=None, smoms=None, giws = None, occs = None):
          self.dc_value[...] = 0
-@@ -231,10 +595,10 @@ class SigZeroBar(SelfConsistent):
+@@ -231,10 +609,10 @@ class SigZeroBar(SelfConsistent):
              return self.dc_value
          for ineq, siw in zip(self.ineq_list, siws):
              niw = siw.shape[0]
@@ -1437,7 +1451,7 @@ index 94059d71..044c14da 100644
  
              szerobar = szero.trace(0,1,3).trace().real
              szerobar /= ineq.nd * self.nspins
-@@ -248,7 +612,7 @@ class SigInfBar(SelfConsistent):
+@@ -248,7 +626,7 @@ class SigInfBar(SelfConsistent):
          self.dc_value[...] = 0
          if smoms is None:
              return self.dc_value
@@ -1446,7 +1460,7 @@ index 94059d71..044c14da 100644
          for ineq, smom in zip(self.ineq_list, smoms):
              sinf = smom[0]     # 0-th moment
              sinfbar = sinf.trace(0,1,3).trace()
-@@ -299,7 +663,7 @@ class Trace(SelfConsistent):
+@@ -299,7 +677,7 @@ class Trace(SelfConsistent):
                  dens0_impurity = ineq.occ_dc_number
              else:
                  dens0_impurity = occ0
