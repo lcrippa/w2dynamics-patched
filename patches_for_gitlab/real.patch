@@ -1300,7 +1300,7 @@ index 9c369f03..c2d2f879 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..dfed3edb 100644
+index 07f954ba..a8319c6a 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1312,7 +1312,7 @@ index 07f954ba..dfed3edb 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,371 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,376 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -1344,6 +1344,11 @@ index 07f954ba..dfed3edb 100644
 +                    rotmat = pickle.load(f)
 +                    self.rotationmatrix = np.kron(np.eye(2), rotmat)
 +                print("Read rotation matrix from "+rotationmatrix)
++                print("      ")
++                print("Rotation matrix")
++                for row in self.rotationmatrix:
++                    print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++                print("      ")
 +            except:
 +                print("No valid rotation matrix provided!")
 +                sys.exit()
