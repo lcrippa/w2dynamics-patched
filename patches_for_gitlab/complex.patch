@@ -963,7 +963,7 @@ index 00000000..9402ed34
 +Percentage4OperatorMove=0.02
 +MeasSusz=1
 diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
-index 2010cbe2..982a5127 100644
+index 2010cbe2..3e264643 100644
 --- a/w2dyn/auxiliaries/config.py
 +++ b/w2dyn/auxiliaries/config.py
 @@ -378,6 +378,20 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
@@ -980,9 +980,9 @@ index 2010cbe2..982a5127 100644
 +                                    np.array(cfg["General"]["Wterm_a11"],dtype=np.double),
 +                                    np.array(cfg["General"]["Wterm_beta"],dtype=np.double),
 +                                    np.array(cfg["General"]["Wterm_shifts"],dtype=np.double),
-+                                    cfg["General"]["Wterm_rotationmatrix"],
 +                                    np.array(cfg["General"]["Wterm_Fock"],dtype=bool),
 +                                    np.array(cfg["General"]["Wterm_legacy"],dtype=bool),
++                                    cfg["General"]["Wterm_rotationmatrix"],
 +                                    ineq_list, lda_dens, atom_list, u_full)
      else:
          raise NotImplemented("Unknown double counting scheme")
@@ -1023,7 +1023,7 @@ index c3441591..7cc8929b 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 94059d71..a3ac16d5 100644
+index 94059d71..044c14da 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,

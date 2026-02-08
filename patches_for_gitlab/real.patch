@@ -1240,10 +1240,10 @@ index 00000000..9402ed34
 +Percentage4OperatorMove=0.02
 +MeasSusz=1
 diff --git a/w2dyn/auxiliaries/config.py b/w2dyn/auxiliaries/config.py
-index b7c8d284..b33e6acc 100644
+index b7c8d284..695ed3f6 100644
 --- a/w2dyn/auxiliaries/config.py
 +++ b/w2dyn/auxiliaries/config.py
-@@ -365,6 +365,19 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
+@@ -365,6 +365,20 @@ def doublecounting_from_cfg(cfg, ineq_list, mylattice, atom_list, u_full):
          return doublecounting.SigZeroBar(ineq_list, lda_dens, atom_list, u_full)
      elif dc_type == 'trace':
          return doublecounting.Trace(ineq_list, lda_dens, atom_list, u_full)
@@ -1259,15 +1259,16 @@ index b7c8d284..b33e6acc 100644
 +                                    np.array(cfg["General"]["Wterm_shifts"],dtype=np.double),
 +                                    np.array(cfg["General"]["Wterm_Fock"],dtype=bool),
 +                                    np.array(cfg["General"]["Wterm_legacy"],dtype=bool),
++                                    cfg["General"]["Wterm_rotationmatrix"],
 +                                    ineq_list, lda_dens, atom_list, u_full)
      else:
          raise NotImplemented("Unknown double counting scheme")
  
 diff --git a/w2dyn/auxiliaries/configspec b/w2dyn/auxiliaries/configspec
-index 9c369f03..f6ff2003 100644
+index 9c369f03..c2d2f879 100644
 --- a/w2dyn/auxiliaries/configspec
 +++ b/w2dyn/auxiliaries/configspec
-@@ -281,11 +281,28 @@ mu_mixing       = float(default=0.0)            # mix in old chemical potential
+@@ -281,11 +281,29 @@ mu_mixing       = float(default=0.0)            # mix in old chemical potential
  half-bandwidth  = force_list(default=2.)        # half-bandwidth of the DOS
  # additional values for LDA+DMFT calculations
  NAt             = integer(default=1)
@@ -1288,6 +1289,7 @@ index 9c369f03..f6ff2003 100644
 +Wterm_V         = float(default=0.0)
 +Wterm_J         = float(default=0.0)
 +Wterm_shifts    = force_list(default=None)
++Wterm_rotationmatrix    = string(default=None) 
 +Wterm_ll        = float(default=0.0)
 +Wterm_a22       = float(default=0.0)
 +Wterm_a11       = float(default=0.0)
@@ -1298,7 +1300,7 @@ index 9c369f03..f6ff2003 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..3f39db04 100644
+index 07f954ba..ef5be3fa 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1310,12 +1312,12 @@ index 07f954ba..3f39db04 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,318 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,371 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
 +class Wterm(SelfConsistent):
-+    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, Fock, legacy, *args, **kwargs):
++    def __init__(self, u2, w, v, j, ll, a22, a11, beta, shifts, Fock, legacy, rotationmatrix, *args, **kwargs):
 +        super().__init__(*args, **kwargs)
 +        self.sav = ShellAveraged(self.shell_av['densities'],
 +                                 self.shell_av['atom_list'],
@@ -1335,6 +1337,40 @@ index 07f954ba..3f39db04 100644
 +        
 +        if abs(self.ll) > 1e-10:
 +            self.do_phonons = True
++            
++        if rotationmatrix is not None:
++            try:
++                with open(rotationmatrix, "rb") as f:
++                    rotmat = pickle.load(f)
++                    self.rotationmatrix = np.kron(np.eye(2), rotmat)
++                print("Read rotation matrix from "+rotationmatrix)
++            except:
++                print("No valid rotation matrix provided!")
++                sys.exit()
++        else:
++            print("Setting rotation matrix to identity")
++            self.rotationmatrix = np.eye(24)
++            
++    def rotate_to_bandbasis(self, mat):
++        mat_t = mat.transpose(1, 0, 3, 2)
++        mat_t = mat_t.reshape(24,24)
++
++        mat_t = np.dot(np.linalg.inv(self.rotationmatrix),np.matmul(mat_t,self.rotationmatrix))
++
++        mat_t = mat_t.reshape(2, 12, 2, 12)
++        mat_t = mat_t.transpose(1, 0, 3, 2)
++        return mat_t
++        
++    def rotate_to_orbbasis(self, mat):
++        mat_t = mat.transpose(1, 0, 3, 2)
++        mat_t = mat_t.reshape(24,24)
++
++        mat_t = np.dot(self.rotationmatrix,np.matmul(mat_t,np.linalg.inv(self.rotationmatrix)))
++
++        mat_t = mat_t.reshape(2, 12, 2, 12)
++        mat_t = mat_t.transpose(1, 0, 3, 2)
++        return mat_t
++    
 +        
 +    def orbvalley_index_j(self,orbindex,valleyindex,elec_type):
 +        if elec_type=="f":
@@ -1360,6 +1396,9 @@ index 07f954ba..3f39db04 100644
 +                for ispin in range(2):
 +                    densities[iorb,ispin,iorb,ispin] = self.shell_av['densities'][iorb,ispin]
 +
++        #rotate to orbital basis: this DC works in the original basis!
++
++        densities = self.rotate_to_orbbasis(densities)
 +
 +        densities = np.real(densities)
 +        diagonal_densities = orbspin.extract_diagonal(densities)
@@ -1610,6 +1649,22 @@ index 07f954ba..3f39db04 100644
 +        # Sum all and return #
 +        ######################
 +        
++        #rotate the DC to the band basis! this is where we do the calculations
++        print("      ")
++        print("Before rotation:")
++        for row in tmp_dc_full[:,0,:,0]:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++        print("      ")
++
++        tmp_dc_full = self.rotate_to_bandbasis(tmp_dc_full)
++       
++        print("      ")
++        print("After rotation:")
++        for row in tmp_dc_full[:,0,:,0]:
++            print(" ".join(f"{elem.real: >7.4f}{'+' if elem.imag >= 0 else '-'}{abs(elem.imag):<7.4f}i" for elem in row))
++        print("      ")
++
++
 +        if np.any(np.iscomplex(tmp_dc_full)):
 +            sys.exit("DC has finite imaginary part!")
 +        else:
