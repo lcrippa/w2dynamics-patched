@@ -1300,7 +1300,7 @@ index 9c369f03..c2d2f879 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..a8319c6a 100644
+index 07f954ba..965c032d 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
 @@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
@@ -1312,7 +1312,7 @@ index 07f954ba..a8319c6a 100644
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,376 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +226,381 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
@@ -1405,7 +1405,12 @@ index 07f954ba..a8319c6a 100644
 +
 +        densities = self.rotate_to_orbbasis(densities)
 +
-+        densities = np.real(densities)
++        densities = densities.reshape(24, 24)
++        densities = 0.5*(densities + densities.conj().T)
++        densities = densities.reshape(12, 2, 12, 2)
++
++        #densities = np.real(densities)
++        
 +        diagonal_densities = orbspin.extract_diagonal(densities)
 +        shifts = np.array(self.shifts)
 +        tmp_dc_full = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins),dtype=complex)
