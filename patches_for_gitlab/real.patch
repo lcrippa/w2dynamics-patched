@@ -1300,19 +1300,20 @@ index 9c369f03..c2d2f879 100644
  
  # fix mu parameters
 diff --git a/w2dyn/dmft/doublecounting.py b/w2dyn/dmft/doublecounting.py
-index 07f954ba..965c032d 100644
+index 07f954ba..40886595 100644
 --- a/w2dyn/dmft/doublecounting.py
 +++ b/w2dyn/dmft/doublecounting.py
-@@ -5,6 +5,8 @@ from __future__ import (absolute_import, division,
+@@ -5,6 +5,9 @@ from __future__ import (absolute_import, division,
  import numpy as np
  import w2dyn.dmft.orbspin as orbspin
  import w2dyn.dmft.atoms as atoms
 +import sys
 +import w2dyn.dmft.mf_phonons as phonons
++import pickle
  # import w2dyn.dmft.lattice as lattice
  # import w2dyn.auxiliaries.transform as tf
  
-@@ -224,6 +226,381 @@ class SelfConsistent(DoubleCounting):
+@@ -224,6 +227,381 @@ class SelfConsistent(DoubleCounting):
          self.dc_value = np.zeros((self.norbitals, self.nspins, self.norbitals, self.nspins))
          self.self_cons = True
  
